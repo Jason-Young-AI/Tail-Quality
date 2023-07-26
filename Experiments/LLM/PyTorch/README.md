@@ -18,16 +18,17 @@ path/to/mmlu/
 ### Result Files Format
 All results are saved in `json` format.
 * `${RES_NAME}.main.*` - record main results about:
-    1. `task_name`:
+    1. `task_name`: - dict()
         - `pred_answers` - list()
         - `gold_answers` - list()
         - `token_lengths` - int
         - `question_numbers` - int
 * `${RES_NAME}.time.*` - record performance results about:
-    1. `pred_times`:
-        -. `inference_time` - float
-        -. `postprocess_time` - float
-        -. `preprocess_time` - float
+    1. `task_name`: - dict()
+        1. `pred_times`: - list(dict())
+            - `inference_time` - float
+            - `postprocess_time` - float
+            - `preprocess_time` - float
 
 Suppose one want to run the workload 100 times, and set batch size as 1, then the following command will save all the results in `${RES_DIR}` and all files will be named with `${RES_NAME}`:
 - <a href='#local'>Local Mode</a>
