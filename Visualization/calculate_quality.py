@@ -1,29 +1,29 @@
 import json
+import numpy
 import pathlib
 import argparse
 
 quality_choices = ['acc', 'map', 'wf1']
-dataset_choices = ['ImageNet', 'MSCOCO']
+dataset_choices = ['ImageNet', 'MSCOCO', 'MMLU']
 
 
 def calculate_acc(results, dataset_type='ImageNet'):
-    if len(results) == 0:
-        return float("NaN"), float("NaN")
-
-    truth_indices = list()
-    top5_indices = list()
-    top1_indices = list()
     assert dataset_type in dataset_choices, f"Wrong Type of Dataset: {dataset_type}"
-    for instance in results:
-        if dataset_type == 'ImageNet':
+
+    if dataset_type == 'ImageNet':
+        if len(results) == 0:
+            return float("NaN"), float("NaN")
+
+        truth_indices = list()
+        top5_indices = list()
+        top1_indices = list()
+        for instance in results:
             truth_index = instance['image_id']
             top5_index = instance['result']['top5_class_indices']
             top1_index = top5_index[0]
             truth_indices.append(truth_index)
             top5_indices.append(top5_index)
             top1_indices.append(top1_index)
-
-    if dataset_type == 'ImageNet':
         total = 0
         top5_correct = 0
         top1_correct = 0
@@ -34,11 +34,38 @@ def calculate_acc(results, dataset_type='ImageNet'):
 
         top5_acc = top5_correct / total
         top1_acc = top1_correct / total
-    return top5_acc, top1_acc
+        return top5_acc, top1_acc
+
+    if dataset_type == 'MMLU':
+        if len(results) == 0:
+            return float("NaN")
+
+        task_totals = list()
+        task_corrects = list()
+        task_acc = dict()
+        for task in results.keys():
+            pred_answers = results[task]['pred_answers']
+            gold_answers = results[task]['gold_answers']
+
+            task_total = len(gold_answers)
+            task_correct = 0
+            for pred_answer, gold_answer in zip(pred_answers, gold_answers):
+                if pred_answer == gold_answer:
+                    task_correct += 1
+            task_totals.append(task_total)
+            task_corrects.append(task_correct)
+            task_acc[task] = task_correct / task_total
+
+        total = numpy.sum(task_totals)
+        correct = numpy.sum(task_corrects)
+        acc = correct / total
+        return task_acc, acc
 
 
 def calculate_map(results):
-    pass
+    assert dataset_type in dataset_choices, f"Wrong Type of Dataset: {dataset_type}"
+
+    if dataset_type == 'MSCOCO':
 
 
 def calculate_wf1(results):
@@ -69,3 +96,10 @@ if __name__ == "__main__":
     if quality_type == 'acc' and dataset_type == 'ImageNet':
         print(f"Top-5 Accuracy = {quality[0] * 100:.4f} %")
         print(f"Top-1 Accuracy = {quality[1] * 100:.4f} %")
+
+    if quality_type == 'acc' and dataset_type == 'MMLU':
+        print(f"Task Accuracies:")
+        for task in quality[0].keys():
+            task_name = ' '.join([task_sub.capitalize() for task_sub in task.split('_')])
+            print(f"{task_name} = {quality[0][task] * 100:.4f} %")
+        print(f"Total Accuracy = {quality[1] * 100:.4f} %")
