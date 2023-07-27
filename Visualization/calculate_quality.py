@@ -3,69 +3,168 @@ import numpy
 import pathlib
 import argparse
 
-quality_choices = ['acc', 'map', 'wf1']
-dataset_choices = ['ImageNet', 'MSCOCO', 'MMLU']
-combine_choices = ['i', 'ip', 'pi', 'pip'] # inf, inf->post, pre->inf, pre->inf->post
+from constant import dataset_choices, combine_choices, quality_choices
+
+
+def extract_ImageNet_times(times):
+    inference_times = list()
+    preprocess_times = list()
+    postprocess_times = list()
+    for instance in times:
+        inference_times.append(instance['inference_time'])
+        preprocess_times.append(instance['preprocess_time'])
+        postprocess_times.append(instance['postprocess_time'])
+    extracted_times = dict(
+        inference_times = numpy.array(inference_times),
+        preprocess_times = numpy.array(preprocess_times),
+        postprocess_times = numpy.array(postprocess_times),
+    )
+    return extracted_times
+
+
+def extract_MMLU_times(times):
+    inference_times = dict()
+    preprocess_times = dict()
+    postprocess_times = dict()
+    for task in times.keys():
+        inference_times[task] = list()
+        preprocess_times[task] = list()
+        postprocess_times[task] = list()
+        for instance in times[task]['pred_times']:
+            inference_times[task].append(instance['inference_time'])
+            preprocess_times[task].append(instance['preprocess_time'])
+            postprocess_times[task].append(instance['postprocess_time'])
+        inference_times[task] = numpy.array(inference_times[task])
+        preprocess_times[task] = numpy.array(preprocess_times[task])
+        postprocess_times[task] = numpy.array(postprocess_times[task])
+    extracted_times = dict(
+        inference_times = inference_times,
+        preprocess_times = preprocess_times,
+        postprocess_times = postprocess_times,
+    )
+    return extracted_times
+
+
+def extract_COCO_times(times):
+    inference_times = list()
+    preprocess_times = list()
+    postprocess_times = list()
+    for instance in times:
+        inference_times.append(instance['inference_time'])
+        preprocess_times.append(instance['preprocess_time'])
+        postprocess_times.append(instance['postprocess_time'])
+    extracted_times = dict(
+        inference_times = numpy.array(inference_times),
+        preprocess_times = numpy.array(preprocess_times),
+        postprocess_times = numpy.array(postprocess_times),
+    )
+    return extracted_times
+
+
+def calculate_stat(cts):
+    if len(cts):
+        mins = numpy.min(cts, axis=-1)
+        maxs = numpy.max(cts, axis=-1)
+        meds = numpy.median(cts, axis=-1)
+        avgs = numpy.average(cts, axis=-1)
+        vars = numpy.var(cts, axis=-1, ddof=1)
+        stds = numpy.std(cts, axis=-1, ddof=1)
+        q1s = numpy.quantile(cts, 0.25, axis=-1)
+        q3s = numpy.quantile(cts, 0.75, axis=-1)
+        iqrs = q3s - q1s
+        lower_whiskers = q1s - 1.5 * iqrs
+        upper_whiskers = q3s + 1.5 * iqrs
+    else:
+        mins = numpy.array([])
+        maxs = numpy.array([])
+        meds = numpy.array([])
+        avgs = numpy.array([])
+        vars = numpy.array([])
+        stds = numpy.array([])
+        q1s = numpy.array([])
+        q3s = numpy.array([])
+        iqrs = numpy.array([])
+        lower_whiskers = numpy.array([])
+        upper_whiskers = numpy.array([])
+
+    return dict(
+        mins = mins,
+        maxs = maxs,
+        meds = meds,
+        avgs = avgs,
+        vars = vars,
+        stds = stds,
+        q1s = q1s,
+        q3s = q3s,
+        iqrs = iqrs,
+        lower_whiskers = lower_whiskers,
+        upper_whiskers = upper_whiskers
+    )
 
 
 def combine_ImageNet_times(times, combine_type):
+    # Arugment 'times' should contain 3 keys: inference_time, preprocess_time, postprocess_time
+    # Each value of the corresponding key must be an numpy.array object with shape [instance_number, ]
     assert combine_type in combine_choices, f"Wrong Type of Combine Type: {combine_type}"
-    combined_times = list()
-    for time_dict in times:
-        inf_time = time_dict['inference_time']
-        pre_time = time_dict['preprocess_time']
-        post_time = time_dict['postprocess_time']
-        if combine_type == 'i':
-            combined_time = inf_time
-        if combine_type == 'pi':
-            combined_time = pre_time + inf_time
-        if combine_type == 'ip':
-            combined_time = inf_time + post_time
-        if combine_type == 'pip':
-            combined_time = pre_time + inf_time + post_time
-        combined_times.append(combined_time)
+
+    inf_time = times['inference_times']
+    pre_time = times['preprocess_times']
+    post_time = times['postprocess_times']
+
+    if combine_type == 'i':
+        combined_times = inf_time
+    if combine_type == 'pi':
+        combined_times = pre_time + inf_time
+    if combine_type == 'ip':
+        combined_times = inf_time + post_time
+    if combine_type == 'pip':
+        combined_times = pre_time + inf_time + post_time
 
     return combined_times
+
 
 
 def combine_MMLU_times(times, combine_type):
+    # For the 'task' key of arugment 'times', the value of each key should contain 3 keys: inference_time, preprocess_time, postprocess_time
+    # Each value of the corresponding key must be an numpy.array object with shape [question_number, ]
+    # Or this method can be used independently with that inf_time, pre_time, and post_time be same shape
     assert combine_type in combine_choices, f"Wrong Type of Combine Type: {combine_type}"
+
+    inf_time = times['inference_times']
+    pre_time = times['preprocess_times']
+    post_time = times['postprocess_times']
+
     combined_times = dict()
-    for task in times.keys():
-        combined_times[task] = list()
-        for time_dict in times[task]['pred_times']:
-            inf_time = time_dict['inference_time']
-            pre_time = time_dict['preprocess_time']
-            post_time = time_dict['postprocess_time']
-            if combine_type == 'i':
-                combined_time = inf_time
-            if combine_type == 'pi':
-                combined_time = pre_time + inf_time
-            if combine_type == 'ip':
-                combined_time = inf_time + post_time
-            if combine_type == 'pip':
-                combined_time = pre_time + inf_time + post_time
-            combined_times[task].append(combined_time)
+    for task in times['tasks']:
+        if combine_type == 'i':
+            combined_times[task] = inf_time[task]
+        if combine_type == 'pi':
+            combined_times[task] = pre_time[task] + inf_time[task]
+        if combine_type == 'ip':
+            combined_times[task] = inf_time[task] + post_time[task]
+        if combine_type == 'pip':
+            combined_times[task] = pre_time[task] + inf_time[task] + post_time[task]
 
     return combined_times
 
 
-def combine_MSCOCO_times(times, combine_type):
+def combine_COCO_times(times, combine_type):
+    # Arugment 'times' should contain 3 keys: inference_time, preprocess_time, postprocess_time
+    # Each value of the corresponding key must be an numpy.array object with shape [instance_number, ]
     assert combine_type in combine_choices, f"Wrong Type of Combine Type: {combine_type}"
-    combined_times = list()
-    for time_dict in times:
-        inf_time = time_dict['inference_time']
-        pre_time = time_dict['preprocess_time']
-        post_time = time_dict['postprocess_time']
-        if combine_type == 'i':
-            combined_time = inf_time
-        if combine_type == 'pi':
-            combined_time = pre_time + inf_time
-        if combine_type == 'ip':
-            combined_time = inf_time + post_time
-        if combine_type == 'pip':
-            combined_time = pre_time + inf_time + post_time
-        combined_times.extend([combined_time,] * 100) # maxDets is set to 100 as default.
+
+    inf_time = times['inference_times']
+    pre_time = times['preprocess_times']
+    post_time = times['postprocess_times']
+
+    if combine_type == 'i':
+        combined_times = inf_time
+    if combine_type == 'pi':
+        combined_times = pre_time + inf_time
+    if combine_type == 'ip':
+        combined_times = inf_time + post_time
+    if combine_type == 'pip':
+        combined_times = pre_time + inf_time + post_time
 
     return combined_times
 
@@ -74,6 +173,7 @@ def calculate_acc(results, dataset_type='ImageNet', assets_path=pathlib.Path('as
     assert dataset_type in dataset_choices, f"Wrong Type of Dataset: {dataset_type}"
 
     if dataset_type == 'ImageNet':
+        # times should be array-like object
         if len(results) == 0:
             return float("NaN"), float("NaN")
 
@@ -109,8 +209,9 @@ def calculate_acc(results, dataset_type='ImageNet', assets_path=pathlib.Path('as
         return top5_acc, top1_acc
 
     if dataset_type == 'MMLU':
+        # times should be a dict and each element is an array-like object
         if len(results) == 0:
-            return float("NaN")
+            return dict(NaN=float("NaN")), float("NaN")
 
         task_totals = list()
         task_corrects = list()
@@ -140,10 +241,8 @@ def calculate_acc(results, dataset_type='ImageNet', assets_path=pathlib.Path('as
         return task_acc, acc
 
 
-def calculate_map(results, dataset_type='ImageNet', assets_path=pathlib.Path('assets'), threshold=None, times=None):
+def calculate_map(results, dataset_type='COCO', assets_path=pathlib.Path('assets'), threshold=None, times=None):
     assert dataset_type in dataset_choices, f"Wrong Type of Dataset: {dataset_type}"
-
-    anno_path = assets_path.joinpath("annotations", "instances_val2017.json")
 
     def coco_json2numpy(json_results):
         numpy_results = numpy.ndarray((len(json_results), 7))
@@ -172,20 +271,32 @@ def calculate_map(results, dataset_type='ImageNet', assets_path=pathlib.Path('as
 
         return clean_results
 
+    def expand_results(results):
+        expanded_results = list()
+        for instance in results:
+            expanded_results.extend(instance['result'])
+        return expanded_results
 
-    if dataset_type == 'MSCOCO':
+
+    if dataset_type == 'COCO':
+        # times should be array-like object
         try:
             from pycocotools.coco import COCO
             from pycocotools.cocoeval import COCOeval
         except Exception:
             raise ImportError("Can not import COCO or COCOeval from pycocotools, please install the missing package by using \'pip install pycocotools\' ") from Exception
 
-        coco_gt = COCO(anno_path)
+        if len(results) == 0:
+            return [float("NaN"), ]
 
         results = remove_instances(results, threshold, times)
+        results = expand_results(results)
         results = coco_json2numpy(results)
         if len(results) == 0:
-            return 0
+            return [0, ]
+
+        anno_path = assets_path.joinpath("COCO", "annotations", "instances_val2017.json")
+        coco_gt = COCO(anno_path)
 
         coco_dt = coco_gt.loadRes(results)
         cocoEval = COCOeval(coco_gt, coco_dt, iouType='bbox')
@@ -195,19 +306,19 @@ def calculate_map(results, dataset_type='ImageNet', assets_path=pathlib.Path('as
         return cocoEval.stats
 
 
-def calculate_wf1(results, dataset_type='ImageNet', assets_path=pathlib.Path('assets'), threshold=None, times=None):
+def calculate_wf1(results, dataset_type='MELD', assets_path=pathlib.Path('assets'), threshold=None, times=None):
     pass
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Calculate Quality')
-    parser.add_argument('--results-path', type=str, required=True)
-    parser.add_argument('--threshold', type=float, default=None)
-    parser.add_argument('--times-path', type=str, default=None)
-    parser.add_argument('--assets-path', type=str, default='assets')
-    parser.add_argument('--quality-type', type=str, default='acc', choices=quality_choices)
-    parser.add_argument('--dataset-type', type=str, default='ImageNet', choices=dataset_choices)
-    parser.add_argument('--combine-type', type=str, default='i', choices=combine_choices)
+    parser.add_argument('-r', '--results-path', type=str, required=True)
+    parser.add_argument('-t', '--threshold', type=float, default=None)
+    parser.add_argument('-l', '--times-path', type=str, default=None)
+    parser.add_argument('-a', '--assets-path', type=str, default='assets')
+    parser.add_argument('-q', '--quality-type', type=str, default='acc', choices=quality_choices)
+    parser.add_argument('-d', '--dataset-type', type=str, default='ImageNet', choices=dataset_choices)
+    parser.add_argument('-c', '--combine-type', type=str, default='i', choices=combine_choices)
     arguments = parser.parse_args()
 
     results_path = pathlib.Path(arguments.results_path)
@@ -231,6 +342,8 @@ if __name__ == "__main__":
         times_path = pathlib.Path(arguments.times_path)
         assert times_path.is_file(), f"No Such times File: {times_path}"
         times = json.load(open(times_path))
+        extract_times = globals()['extract_' + dataset_type + '_times']
+        times = extract_times(times)
         combine_times = globals()['combine_' + dataset_type + '_times']
         times = combine_times(times, arguments.combine_type)
 
@@ -251,5 +364,5 @@ if __name__ == "__main__":
             print(f"{task_name} = {quality[0][task] * 100:.4f} %")
         print(f"Total Accuracy = {quality[1] * 100:.4f} %")
 
-    if quality_type == 'map' and dataset_type == 'MSCOCO':
+    if quality_type == 'map' and dataset_type == 'COCO':
         print(f"Average Precision (AP) @[ IoU=0.5:0.95 | area=all | maxDets=100 ] = {quality[0] * 100:.4f} %")

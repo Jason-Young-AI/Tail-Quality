@@ -4,10 +4,14 @@ import argparse
 
 from matplotlib import pyplot
 
-dataset_choices = ['ImageNet', 'COCO']
+from constant import dataset_choices, combine_choices, stat_map
+from calculate_quality import calculate_stat, combine_ImageNet_times, combine_MMLU_times, combine_COCO_times, calculate_acc, calculate_map, calculate_wf1
 
 
-def draw_coco_count_per_bis(save_dir, bis_to_count):
+
+
+def draw_coco_count_per_bis(imgs_save_dir, bis_to_count):
+    # batch image size
     fig, ax = pyplot.subplots(1, 1, figsize=(10, 10))
 
     biss = list()
@@ -28,53 +32,12 @@ def draw_coco_count_per_bis(save_dir, bis_to_count):
     ax.tick_params(axis='x', which='major', pad=3, labelsize=6, labelrotation=0, labelright=True, labelleft=False)
     ax.tick_params(axis='y', which='major', pad=3, labelsize=6, labelrotation=0, labelright=False, labelleft=True)
 
-    figpath = save_dir.joinpath('count_per_bis.pdf')
+    figpath = imgs_save_dir.joinpath('count_per_bis.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
 
 
-def calculate_stat(its):
-    if len(its):
-        mins = numpy.min(its, axis=-1)
-        maxs = numpy.max(its, axis=-1)
-        meds = numpy.median(its, axis=-1)
-        avgs = numpy.average(its, axis=-1)
-        vars = numpy.var(its, axis=-1, ddof=1)
-        stds = numpy.std(its, axis=-1, ddof=1)
-        q1s = numpy.quantile(its, 0.25, axis=-1)
-        q3s = numpy.quantile(its, 0.75, axis=-1)
-        iqrs = q3s - q1s
-        lower_whiskers = q1s - 1.5 * iqrs
-        upper_whiskers = q3s + 1.5 * iqrs
-    else:
-        mins = numpy.array([])
-        maxs = numpy.array([])
-        meds = numpy.array([])
-        avgs = numpy.array([])
-        vars = numpy.array([])
-        stds = numpy.array([])
-        q1s = numpy.array([])
-        q3s = numpy.array([])
-        iqrs = numpy.array([])
-        lower_whiskers = numpy.array([])
-        upper_whiskers = numpy.array([])
-
-    return dict(
-        mins = mins,
-        maxs = maxs,
-        meds = meds,
-        avgs = avgs,
-        vars = vars,
-        stds = stds,
-        q1s = q1s,
-        q3s = q3s,
-        iqrs = iqrs,
-        lower_whiskers = lower_whiskers,
-        upper_whiskers = upper_whiskers
-    )
-
-
-def draw_coco_stat(save_dir, bis_to_its, stat_name='avgs'):
+def draw_coco_stat(imgs_save_dir, bis_to_cts, stat_name='avgs'):
     # 1. Draw 3D Scatter
     #    A. H > W, (x, y, z) = (H, W, stat(Time))
     #    B. H > W, (x, y, z) = (W, H, stat(Time))
@@ -84,9 +47,9 @@ def draw_coco_stat(save_dir, bis_to_its, stat_name='avgs'):
     yx_xs = list()
     yx_ys = list()
     yx_zs = list()
-    for bis, its in bis_to_its.items():
+    for bis, cts in bis_to_cts.items():
         x, y = bis
-        stat = calculate_stat(numpy.array(its))
+        stat = calculate_stat(numpy.array(cts))
         if x <= y:
             for s in stat[stat_name]:
                 xy_xs.append(x)
@@ -108,8 +71,8 @@ def draw_coco_stat(save_dir, bis_to_its, stat_name='avgs'):
 
     ax.set_xlabel('Height', fontsize=8)
     ax.set_ylabel('Width', fontsize=8)
-    ax.set_zlabel('Average Time', fontsize=8)
-    ax.set_title('Average time of each image', fontsize=8)
+    ax.set_zlabel(f'{stat_map[stat_name]} Time', fontsize=8)
+    ax.set_title(f'{stat_map[stat_name]} time of each image', fontsize=8)
 
     ax.tick_params(axis='x', which='major', pad=1, labelsize=6)
     ax.tick_params(axis='y', which='major', pad=1, labelsize=6)
@@ -125,15 +88,15 @@ def draw_coco_stat(save_dir, bis_to_its, stat_name='avgs'):
 
     ax.set_xlabel('Height', fontsize=8)
     ax.set_ylabel('Width', fontsize=8)
-    ax.set_zlabel('Average Time', fontsize=8)
-    ax.set_title('Average time of each image (Swapped)', fontsize=8)
+    ax.set_zlabel(f'{stat_map[stat_name]} Time', fontsize=8)
+    ax.set_title(f'{stat_map[stat_name]} time of each image (Swapped)', fontsize=8)
 
     ax.tick_params(axis='x', which='major', pad=1, labelsize=6)
     ax.tick_params(axis='y', which='major', pad=1, labelsize=6)
     ax.tick_params(axis='z', which='major', pad=1, labelsize=6)
     ax.legend()
 
-    figpath = save_dir.joinpath(f'3d_scatter_{stat_name}.pdf')
+    figpath = imgs_save_dir.joinpath(f'3d_scatter_{stat_name}.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
 
@@ -199,10 +162,10 @@ def draw_coco_stat(save_dir, bis_to_its, stat_name='avgs'):
     ax.scatter(div_yx_xs, div_yx_ys, s=5, c='xkcd:gold', marker=">", label="Long Height")
 
     ax.set_xlabel('Height / Width', fontsize=8)
-    ax.set_ylabel('Average Time', fontsize=8)
-    ax.set_title('Average time of each image', fontsize=8)
+    ax.set_ylabel(f'{stat_map[stat_name]} Time', fontsize=8)
+    ax.set_title(f'{stat_map[stat_name]} time of each image', fontsize=8)
 
-    step = (div_xy_xs[-1] - div_xy_xs[0]) / 20
+    step = (div_xy_xs[-1] - div_xy_xs[0]) / 20 # ticks' label step
     xticks = list()
     xticklabels = list()
     index = 0
@@ -227,10 +190,10 @@ def draw_coco_stat(save_dir, bis_to_its, stat_name='avgs'):
     ax.scatter(mul_yx_xs, mul_yx_ys, s=5, c='xkcd:gold', marker=">", label="Long Height")
 
     ax.set_xlabel('Height * Width', fontsize=8)
-    ax.set_ylabel('Average Time', fontsize=8)
-    ax.set_title('Average time of each image', fontsize=8)
+    ax.set_ylabel(f'{stat_map[stat_name]} Time', fontsize=8)
+    ax.set_title(f'{stat_map[stat_name]} time of each image', fontsize=8)
 
-    step = (mul_xy_xs[-1] - mul_xy_xs[0]) / 20
+    step = (mul_xy_xs[-1] - mul_xy_xs[0]) / 20 # ticks' label step
     xticks = list()
     xticklabels = list()
     index = 0
@@ -249,12 +212,12 @@ def draw_coco_stat(save_dir, bis_to_its, stat_name='avgs'):
     ax.tick_params(axis='y', which='major', pad=1, labelsize=6)
     ax.legend()
 
-    figpath = save_dir.joinpath(f'2d_scatter_{stat_name}.pdf')
+    figpath = imgs_save_dir.joinpath(f'2d_scatter_{stat_name}.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
 
 
-def draw_coco_specific_stat(save_dir, bis_to_its, bis_to_count, top=5):
+def draw_coco_specific_stat(imgs_save_dir, bis_to_cts, bis_to_count, top=5):
 
     def draw_essential_stat(ax, hw_e_stat, wh_e_stat, x_label):
         hw_e_i = list(range(0, len(hw_e_stat)))
@@ -265,19 +228,19 @@ def draw_coco_specific_stat(save_dir, bis_to_its, bis_to_count, top=5):
         if len(wh_e_i) != 0:
             ax.scatter(wh_e_i, wh_e_stat, s=6, c='xkcd:orangered', marker=">", label="Long Height")
 
-        ax.set_xlabel(f'{x_label} Time', fontsize=8)
-        ax.set_ylabel('Count', fontsize=8)
-        ax.set_title(f'{x_label} Time V.S. Count', fontsize=8)
+        ax.set_xlabel('Images ID', fontsize=8)
+        ax.set_ylabel(f'{x_label} Time', fontsize=8)
+        ax.set_title(f'{x_label} Time Details', fontsize=8)
         ax.legend()
 
     total_draw = 0
     for index, ((h, w), _) in enumerate(bis_to_count):
         if total_draw < top:
-            if (h, w) in bis_to_its.keys() and (w, h) in bis_to_its.keys():
+            if (h, w) in bis_to_cts.keys() and (w, h) in bis_to_cts.keys():
                 total_draw = total_draw + 1
 
-                hw_stat = calculate_stat(numpy.array(bis_to_its[(h, w)]))
-                wh_stat = calculate_stat(numpy.array(bis_to_its[(w, h)]))
+                hw_stat = calculate_stat(numpy.array(bis_to_cts[(h, w)]))
+                wh_stat = calculate_stat(numpy.array(bis_to_cts[(w, h)]))
 
                 fig, axes = pyplot.subplots(2, 2, figsize=(20, 20))
 
@@ -286,33 +249,37 @@ def draw_coco_specific_stat(save_dir, bis_to_its, bis_to_count, top=5):
                 draw_essential_stat(axes[1, 0], hw_stat['vars'], wh_stat['vars'], 'Variance')
                 draw_essential_stat(axes[1, 1], hw_stat['stds'], wh_stat['stds'], 'Standard Deviation')
 
-                figpath = save_dir.joinpath(f'specific_stat_{total_draw}_notop{index+1}_{h}-{w}_{h/w:.5f}.pdf')
+                figpath = imgs_save_dir.joinpath(f'specific_stat_{total_draw}_notop{index+1}_{h}-{w}_{h/w:.5f}.pdf')
                 fig.savefig(figpath)
                 print(f' - Fig Exported: {figpath}')
         else:
             break
 
 
-def draw_coco(data, save_dir):
-    image_ids = data['image_ids']
-    batch_image_sizes = data['batch_image_sizes']
-    inference_times = data['inference_times']
+def draw_COCO(extracted_data, combine_type, imgs_save_dir):
+    main_results = extracted_data['main_results']
+    batch_image_sizes = extracted_data['other_results']['batch_image_sizes']
+    #inference_times = extracted_data['other_results']['inference_times']
+    #preprocess_times = extracted_data['other_results']['preprocess_times']
+    #postprocess_times = extracted_data['other_results']['postprocess_times']
 
-    bis_to_its = dict()
-    for batch_image_size, inference_time in zip(batch_image_sizes, inference_times):
+    combined_times = combine_COCO_times(extracted_data['other_results'], combine_type)
+
+    bis_to_cts = dict()
+    for batch_image_size, combined_time in zip(batch_image_sizes, combined_times):
         height, width = batch_image_size
 
         bis = (height, width)
-        it = bis_to_its.get(bis, list())
-        it.append(inference_time)
-        bis_to_its[bis] = it
+        ct = bis_to_cts.get(bis, list())
+        ct.append(combined_time)
+        bis_to_cts[bis] = ct
 
     bis_to_count = dict()
-    for bis in  bis_to_its.keys():
-        its = bis_to_its.get(bis, list())
+    for bis in  bis_to_cts.keys():
+        cts = bis_to_cts.get(bis, list())
         bis = (bis[0], bis[1]) if bis[0] <= bis[1] else (bis[1], bis[0])
         count = bis_to_count.get(bis, 0)
-        count = count + len(its)
+        count = count + len(cts)
         bis_to_count[bis] = count
     bis_to_count = list(bis_to_count.items())
     bis_to_count = sorted(bis_to_count, key=lambda x: x[1])[::-1]
@@ -320,64 +287,103 @@ def draw_coco(data, save_dir):
     print(f'[Begin] Drawing ...')
 
     print(f' v Drawing ...')
-    draw_coco_count_per_bis(save_dir, bis_to_count)
+    draw_coco_count_per_bis(imgs_save_dir, bis_to_count)
     print(f' ^ Draw Count V.S. Image Size Finished.\n')
 
+    # print(f' v Drawing ...')
+    # draw_coco_count_per_nop(imgs_save_dir, bis_to_count)
+    # print(f' ^ Draw Count V.S. Number of Pixels Finished.\n')
+
     print(f' v Drawing ...')
-    draw_coco_stat(save_dir, bis_to_its, 'avgs')
+    draw_coco_stat(imgs_save_dir, bis_to_cts, 'avgs')
     print(f' ^ Draw Statistics \'avg\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_coco_stat(save_dir, bis_to_its, 'mins')
+    draw_coco_stat(imgs_save_dir, bis_to_cts, 'mins')
     print(f' ^ Draw Statistics \'min\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_coco_stat(save_dir, bis_to_its, 'maxs')
+    draw_coco_stat(imgs_save_dir, bis_to_cts, 'maxs')
     print(f' ^ Draw Statistics \'max\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_coco_stat(save_dir, bis_to_its, 'vars')
+    draw_coco_stat(imgs_save_dir, bis_to_cts, 'vars')
     print(f' ^ Draw Statistics \'var\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_coco_specific_stat(save_dir, bis_to_its, bis_to_count, top=10)
+    draw_coco_specific_stat(imgs_save_dir, bis_to_cts, bis_to_count, top=10)
     print(f' ^ Draw Specific Statistics Finished.\n')
 
     print(f'[End] All Finished.')
 
 
-def draw_imagenet(data, save_dir):
+def draw_ImageNet(extracted_data, combine_type, imgs_save_dir):
     pass
 
 
-def draw(npz_path, save_dir, dataset_type='ImageNet'):
+def draw(extracted_data, dataset_type, combine_type, imgs_save_dir):
     assert dataset_type in dataset_choices, f"Wrong Type of Dataset: {dataset_type}"
+    assert combine_type in combine_choices, f"Wrong Type of Combine: {combine_type}"
 
-    data = numpy.load(npz_path)
-
-    if dataset_type == 'ImageNet':
-        draw_imagenet(data, save_dir)
-
-    if dataset_type == 'COCO':
-        draw_coco(data, save_dir)
+    draw_by_dst = globals()['draw_' + dataset_type]
+    draw_by_dst(extracted_data, combine_type, imgs_save_dir)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Calculate Quality')
-    parser.add_argument('-p', '--npz-path', type=str, required=True)
-    parser.add_argument('-d', '--save-dir', type=str, required=True)
+    parser = argparse.ArgumentParser(description='Draw Figs for Datasets')
+
+    parser.add_argument('-i', '--imgs-save-dir', type=str, required=True)
+
+    parser.add_argument('-d', '--data-dir', type=str, default=None)
+    parser.add_argument('-n', '--data-filename', type=str, default=None)
+    parser.add_argument('-s', '--save-dir', type=str, default=None)
+    parser.add_argument('-f', '--save-filename', type=str, default=None)
+    parser.add_argument('-p', '--npz-path', type=str, default=None)
     parser.add_argument('-t', '--dataset-type', type=str, default='ImageNet', choices=dataset_choices)
+    parser.add_argument('-c', '--combine-type', type=str, default='i', choices=combine_choices)
     arguments = parser.parse_args()
 
-    npz_path = pathlib.Path(arguments.npz_path)
-    save_dir = pathlib.Path(arguments.save_dir)
-    dataset_type = arguments.dataset_type
+    combine_type = arguments.combine_type
+    assert combine_type in combine_choices, f"No Such Combine Type: {combine_type}"
 
-    assert npz_path.is_file(), f"No Such NPZ File: {npz_path}"
+    dataset_type = arguments.dataset_type
     assert dataset_type in dataset_choices, f"No Such Dataset Type: {dataset_type}"
 
-    if not save_dir.is_dir():
-        print(f"No Save Dir Exists: {save_dir}, now creating it.")
-        save_dir.mkdir(parents=True, exist_ok=True)
+    imgs_save_dir = pathlib.Path(arguments.imgs_save_dir)
 
-    draw(npz_path, save_dir, dataset_type)
+    if not imgs_save_dir.is_dir():
+        print(f"No Imgs Save Dir Exists: {imgs_save_dir}, now creating it.")
+        imgs_save_dir.mkdir(parents=True, exist_ok=True)
+
+    if arguments.data_dir is None:
+        # Direct Load From NPZ
+        if arguments.npz_path is None:
+            raise AttributeError("At least one argument of \{--data-dir or --npz-path\} must be specified.")
+        else:
+            npz_path = pathlib.Path(arguments.npz_path)
+            assert npz_path.is_file(), f"No Such NPZ File: {npz_path}"
+            extracted_data = numpy.load(npz_path)
+    else:
+        # Load From Raw Data
+        data_dir = pathlib.Path(arguments.data_dir)
+        data_filename = arguments.data_filename
+        assert data_dir.is_dir(), f"No Such Data Dir: {data_dir}"
+        assert data_filename is not None, f"While using argument \'--data-dir\', one must specify \'--data-filename\'"
+
+        from extract_data import extract_data
+        extracted_data = extract_data(data_dir, data_filename, dataset_type)
+
+        if arguments.save_dir is None:
+            print(f"The extracted data will not be saved!\n")
+            print(f"If one want to save the extracted data, please specify arguments \'--save-dir\' and \'--save-filename\'")
+        else:
+            save_dir = pathlib.Path(arguments.save_dir)
+            save_filename = arguments.save_filename
+            assert save_dir.is_dir(), f"No Such Save Dir: {save_dir}"
+            assert save_filename is not None, f"While using argument \'--save-dir\', one must specify \'--save-filename\'"
+            save_filepath = save_dir.joinpath(save_filename)
+            print(f" + Saving data into \'{save_filepath}.npz\' ...")
+            numpy.savez(save_filepath, **extracted_data)
+            print(f" - Saved.")
+
+    draw(extracted_data, dataset_type, combine_type, imgs_save_dir)
