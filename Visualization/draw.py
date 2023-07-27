@@ -2,6 +2,8 @@ import numpy
 import pathlib
 import argparse
 
+import matplotlib.colors as mcolors
+
 from matplotlib import pyplot
 
 from constant import dataset_choices, combine_choices, stat_map
@@ -58,6 +60,33 @@ def draw_coco_count_per_bis(imgs_save_dir, bis_to_count):
     ax.tick_params(axis='y', which='major', pad=3, labelsize=6, labelrotation=0, labelright=False, labelleft=True)
 
     figpath = imgs_save_dir.joinpath('count_per_bis.pdf')
+    fig.savefig(figpath)
+    print(f' - Fig Exported: {figpath}')
+
+
+def draw_mmlu_count_per_tl(imgs_save_dir, tl_to_count):
+    # origin image size
+    fig, ax = pyplot.subplots(1, 1, figsize=(10, 10))
+
+    tls = list()
+    counts = list()
+    for tl, count in tl_to_count:
+        tls.append(str(tl))
+        counts.append(count)
+
+    print(f' . Total {len(tl_to_count)} different token lengths.')
+
+    bars = ax.barh(tls[:20], width=counts[:20], color='skyblue')
+    ax.bar_label(bars, fontsize=6, rotation=-60)
+    ax.invert_yaxis()
+    ax.set_xlabel('Count', fontsize=8)
+    ax.set_ylabel('Token Lengths', fontsize=8)
+    ax.set_title('Count of each token length of prompt (Top 20)', fontsize=8)
+
+    ax.tick_params(axis='x', which='major', pad=3, labelsize=6, labelrotation=0, labelright=True, labelleft=False)
+    ax.tick_params(axis='y', which='major', pad=3, labelsize=6, labelrotation=0, labelright=False, labelleft=True)
+
+    figpath = imgs_save_dir.joinpath('count_per_tl.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
 
@@ -424,6 +453,54 @@ def draw_coco_stat(imgs_save_dir, bis_to_cts, stat_name='avgs'):
     print(f' - Fig Exported: {figpath}')
 
 
+def draw_mmlu_stat(imgs_save_dir, tl_to_cts, stat_name='avgs'):
+    # 2. Draw 2D Scatter
+    #    (x, y) = (Token Length, stat(Time))
+    xy = list()
+    for tl, cts in tl_to_cts.items():
+        stat = calculate_stat(numpy.array(cts))
+        for s in stat[stat_name]:
+            xy.append((tl, s))
+    xy = sorted(xy, key=lambda item: item[0])
+
+    xs = list()
+    ys = list()
+    for x, y in xy:
+        xs.append(x)
+        ys.append(y)
+
+    fig, axes = pyplot.subplots(1, 1, figsize=(10, 10))
+    ax = axes
+    ax.scatter(xs, ys, s=5, c='xkcd:lavender', marker="*", label="Run Stats")
+
+    ax.set_xlabel('Token Length', fontsize=8)
+    ax.set_ylabel(f'{stat_map[stat_name]} Time', fontsize=8)
+    ax.set_title(f'{stat_map[stat_name]} time of each prompt', fontsize=8)
+
+    step = (xs[-1] - xs[0]) / 20 # ticks' label step
+    xticks = list()
+    xticklabels = list()
+    index = 0
+    position = xs[0] - 0.00000001
+    while len(xticks) < 21:
+        if position < xs[index]:
+            xticks.append(xs[index])
+            xticklabels.append(xs[index])
+            position = position + step
+        else:
+            index = index + 1
+
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xticklabels)
+    ax.tick_params(axis='x', which='major', pad=1, labelsize=6, rotation=45)
+    ax.tick_params(axis='y', which='major', pad=1, labelsize=6)
+    ax.legend()
+
+    figpath = imgs_save_dir.joinpath(f'2d_scatter_{stat_name}.pdf')
+    fig.savefig(figpath)
+    print(f' - Fig Exported: {figpath}')
+
+
 def draw_imagenet_specific_stat(imgs_save_dir, ois_to_cts, ois_to_count, top=5):
 
     def draw_essential_stat(ax, hw_e_stat, wh_e_stat, x_label):
@@ -502,43 +579,37 @@ def draw_coco_specific_stat(imgs_save_dir, bis_to_cts, bis_to_count, top=5):
             break
 
 
-# def draw_mmlu_specific_stat(imgs_save_dir, bis_to_cts, bis_to_count, top=5):
+def draw_mmlu_specific_stat(imgs_save_dir, tl_to_cts, tl_to_count, top=5):
 
-#     def draw_essential_stat(ax, hw_e_stat, wh_e_stat, x_label):
-#         hw_e_i = list(range(0, len(hw_e_stat)))
-#         wh_e_i = list(range(len(hw_e_i), len(hw_e_i) + len(wh_e_stat)))
+    def draw_essential_stat(ax, e_stat, x_label):
+        e_i = list(range(0, len(e_stat)))
+        ax.scatter(e_i, e_stat, s=6, c='xkcd:chocolate', marker="<", label="Run Stat")
 
-#         if len(hw_e_i) != 0:
-#             ax.scatter(hw_e_i, hw_e_stat, s=6, c='xkcd:chocolate', marker="<", label="Short Height")
-#         if len(wh_e_i) != 0:
-#             ax.scatter(wh_e_i, wh_e_stat, s=6, c='xkcd:orangered', marker=">", label="Long Height")
+        ax.set_xlabel('Images ID', fontsize=8)
+        ax.set_ylabel(f'{x_label} Time', fontsize=8)
+        ax.set_title(f'{x_label} Time Details', fontsize=8)
+        ax.legend()
 
-#         ax.set_xlabel('Images ID', fontsize=8)
-#         ax.set_ylabel(f'{x_label} Time', fontsize=8)
-#         ax.set_title(f'{x_label} Time Details', fontsize=8)
-#         ax.legend()
+    total_draw = 0
+    for index, (tl, _) in enumerate(tl_to_count):
+        if total_draw < top:
+            if tl in tl_to_cts.keys():
+                total_draw = total_draw + 1
 
-#     total_draw = 0
-#     for index, ((h, w), _) in enumerate(bis_to_count):
-#         if total_draw < top:
-#             if (h, w) in bis_to_cts.keys() and (w, h) in bis_to_cts.keys():
-#                 total_draw = total_draw + 1
+                stat = calculate_stat(numpy.array(tl_to_cts[tl]))
 
-#                 hw_stat = calculate_stat(numpy.array(bis_to_cts[(h, w)]))
-#                 wh_stat = calculate_stat(numpy.array(bis_to_cts[(w, h)]))
+                fig, axes = pyplot.subplots(2, 2, figsize=(20, 20))
 
-#                 fig, axes = pyplot.subplots(2, 2, figsize=(20, 20))
+                draw_essential_stat(axes[0, 0], stat['meds'], 'Median')
+                draw_essential_stat(axes[0, 1], stat['avgs'], 'Average')
+                draw_essential_stat(axes[1, 0], stat['vars'], 'Variance')
+                draw_essential_stat(axes[1, 1], stat['stds'], 'Standard Deviation')
 
-#                 draw_essential_stat(axes[0, 0], hw_stat['meds'], wh_stat['meds'], 'Median')
-#                 draw_essential_stat(axes[0, 1], hw_stat['avgs'], wh_stat['avgs'], 'Average')
-#                 draw_essential_stat(axes[1, 0], hw_stat['vars'], wh_stat['vars'], 'Variance')
-#                 draw_essential_stat(axes[1, 1], hw_stat['stds'], wh_stat['stds'], 'Standard Deviation')
-
-#                 figpath = imgs_save_dir.joinpath(f'specific_stat_{total_draw}_notop{index+1}_{h}-{w}_{h/w:.5f}.pdf')
-#                 fig.savefig(figpath)
-#                 print(f' - Fig Exported: {figpath}')
-#         else:
-#             break
+                figpath = imgs_save_dir.joinpath(f'specific_stat_{total_draw}_notop{index+1}_{tl}.pdf')
+                fig.savefig(figpath)
+                print(f' - Fig Exported: {figpath}')
+        else:
+            break
 
 
 def draw_ImageNet(extracted_data, combine_type, imgs_save_dir):
@@ -571,25 +642,25 @@ def draw_ImageNet(extracted_data, combine_type, imgs_save_dir):
 
     print(f'[Begin] Drawing ...')
 
-    #print(f' v Drawing ...')
-    #draw_imagenet_count_per_ois(imgs_save_dir, ois_to_count)
-    #print(f' ^ Draw Count V.S. Origin Image Size Finished.\n')
+    print(f' v Drawing ...')
+    draw_imagenet_count_per_ois(imgs_save_dir, ois_to_count)
+    print(f' ^ Draw Count V.S. Origin Image Size Finished.\n')
 
-    #print(f' v Drawing ...')
-    #draw_imagenet_stat(imgs_save_dir, ois_to_cts, 'avgs')
-    #print(f' ^ Draw Statistics \'avg\' Finished.\n')
+    print(f' v Drawing ...')
+    draw_imagenet_stat(imgs_save_dir, ois_to_cts, 'avgs')
+    print(f' ^ Draw Statistics \'avg\' Finished.\n')
 
-    #print(f' v Drawing ...')
-    #draw_imagenet_stat(imgs_save_dir, ois_to_cts, 'mins')
-    #print(f' ^ Draw Statistics \'min\' Finished.\n')
+    print(f' v Drawing ...')
+    draw_imagenet_stat(imgs_save_dir, ois_to_cts, 'mins')
+    print(f' ^ Draw Statistics \'min\' Finished.\n')
 
-    #print(f' v Drawing ...')
-    #draw_imagenet_stat(imgs_save_dir, ois_to_cts, 'maxs')
-    #print(f' ^ Draw Statistics \'max\' Finished.\n')
+    print(f' v Drawing ...')
+    draw_imagenet_stat(imgs_save_dir, ois_to_cts, 'maxs')
+    print(f' ^ Draw Statistics \'max\' Finished.\n')
 
-    #print(f' v Drawing ...')
-    #draw_imagenet_stat(imgs_save_dir, ois_to_cts, 'vars')
-    #print(f' ^ Draw Statistics \'var\' Finished.\n')
+    print(f' v Drawing ...')
+    draw_imagenet_stat(imgs_save_dir, ois_to_cts, 'vars')
+    print(f' ^ Draw Statistics \'var\' Finished.\n')
 
     print(f' v Drawing ...')
     draw_imagenet_specific_stat(imgs_save_dir, ois_to_cts, ois_to_count, top=10)
@@ -655,6 +726,112 @@ def draw_COCO(extracted_data, combine_type, imgs_save_dir):
     print(f' v Drawing ...')
     draw_coco_specific_stat(imgs_save_dir, bis_to_cts, bis_to_count, top=10)
     print(f' ^ Draw Specific Statistics Finished.\n')
+
+    print(f'[End] All Finished.')
+
+
+def draw_mmlu_task_stat(imgs_save_dir, token_lengths, combined_times, stat_name='avgs', top=5):
+    fig, axes = pyplot.subplots(1, 1, figsize=(10, 10))
+    ax = axes
+
+    xticks = list()
+    xticklabels = list()
+    total = 0
+    for index, (task, task_xkcd_color) in enumerate(zip(combined_times.keys(), mcolors.XKCD_COLORS.keys())):
+        if index < top:
+            pass
+        else:
+            break
+        stat = calculate_stat(combined_times[task])
+        tl_s = list()
+        for tl, s in zip(token_lengths[task], stat[stat_name]):
+            tl_s.append((tl, s))
+
+        tl_s = sorted(tl_s, key=lambda x: x[0])
+        xs = list(range(total, total+len(tl_s)))
+        ys = list()
+        ls = list()
+        for tl, s in tl_s:
+            ys.append(s)
+            ls.append(tl)
+
+        total += len(tl_s)
+
+        xticks.extend([xs[0], xs[-1]])
+        xticklabels.extend([ls[0], ls[-1]])
+
+        ax.scatter(xs, ys, s=6, c=task_xkcd_color, marker="*", label=task)
+
+    ax.set_xlabel('Tasks with Ascending Token Length', fontsize=8)
+    ax.set_ylabel(f'{stat_map[stat_name]} Time', fontsize=8)
+    ax.set_title(f'{stat_map[stat_name]} time of each prompt', fontsize=8)
+
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xticklabels)
+    ax.tick_params(axis='x', which='major', pad=1, labelsize=6, rotation=45)
+    ax.tick_params(axis='y', which='major', pad=1, labelsize=6)
+    ax.legend()
+
+    figpath = imgs_save_dir.joinpath(f'task_stat_{stat_name}.pdf')
+    fig.savefig(figpath)
+    print(f' - Fig Exported: {figpath}')
+
+
+def draw_MMLU(extracted_data, combine_type, imgs_save_dir):
+    main_results = extracted_data['main_results']
+    tasks = extracted_data['other_results']['tasks']
+    token_lengths = extracted_data['other_results']['token_lengths']
+    #inference_times = extracted_data['other_results']['inference_times']
+    #preprocess_times = extracted_data['other_results']['preprocess_times']
+    #postprocess_times = extracted_data['other_results']['postprocess_times']
+
+    combined_times = combine_MMLU_times(extracted_data['other_results'], combine_type)
+
+    tl_to_cts = dict()
+    for task in tasks:
+        task_token_lengths = token_lengths[task]
+        task_combined_times = combined_times[task]
+        for token_length, combined_time in zip(task_token_lengths, task_combined_times):
+            ct = tl_to_cts.get(token_length, list())
+            ct.append(combined_time)
+            tl_to_cts[token_length] = ct
+
+        tl_to_count = dict()
+        for token_length in tl_to_cts.keys():
+            cts = tl_to_cts.get(token_length, list())
+            tl_to_count[token_length] = tl_to_count.get(token_length, 0) + len(cts)
+        tl_to_count = list(tl_to_count.items())
+        tl_to_count = sorted(tl_to_count, key=lambda x: x[1])[::-1]
+
+    print(f'[Begin] Drawing ...')
+
+    print(f' v Drawing ...')
+    draw_mmlu_count_per_tl(imgs_save_dir, tl_to_count)
+    print(f' ^ Draw Count V.S. Token Length Finished.\n')
+
+    print(f' v Drawing ...')
+    draw_mmlu_stat(imgs_save_dir, tl_to_cts, 'avgs')
+    print(f' ^ Draw Statistics \'avg\' Finished.\n')
+
+    print(f' v Drawing ...')
+    draw_mmlu_stat(imgs_save_dir, tl_to_cts, 'mins')
+    print(f' ^ Draw Statistics \'min\' Finished.\n')
+
+    print(f' v Drawing ...')
+    draw_mmlu_stat(imgs_save_dir, tl_to_cts, 'maxs')
+    print(f' ^ Draw Statistics \'max\' Finished.\n')
+
+    print(f' v Drawing ...')
+    draw_mmlu_stat(imgs_save_dir, tl_to_cts, 'vars')
+    print(f' ^ Draw Statistics \'var\' Finished.\n')
+
+    print(f' v Drawing ...')
+    draw_mmlu_specific_stat(imgs_save_dir, tl_to_cts, tl_to_count, top=10)
+    print(f' ^ Draw Specific Statistics Finished.\n')
+
+    print(f' v Drawing ...')
+    draw_mmlu_task_stat(imgs_save_dir, token_lengths, combined_times, 'avgs', top=10)
+    print(f' ^ Draw Statistics \'var\' Finished.\n')
 
     print(f'[End] All Finished.')
 
