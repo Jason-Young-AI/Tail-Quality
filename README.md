@@ -7,5 +7,6 @@ The official source code for paper: Quality at The Tail
 | ------ | -------                              | ----------                              |
 | DETR   | [README](./Experiments/DETR/PyTorch) | [README](./Experiments/DETR/TensorFlow) |
 | ViT    | [README](./Experiments/ViT/PyTorch)  | [README](./Experiments/ViT/TensorFlow)  |
+| LLM    | [README](./Experiments/LLM/PyTorch)  | N/A                                     |
 
 ### Visualization
