@@ -6,11 +6,12 @@ import matplotlib.colors as mcolors
 
 from matplotlib import pyplot
 
+from extract_data import extract_data
 from constant import dataset_choices, combine_choices, stat_map
-from calculate_quality import calculate_stat, combine_ImageNet_times, combine_MMLU_times, combine_COCO_times, calculate_acc, calculate_map, calculate_wf1
+from calculate_quality import calculate_stat, combine_times
 
 
-def draw_imagenet_count_per_ois(imgs_save_dir, ois_to_count):
+def draw_imagenet_count_per_ois(save_dir, ois_to_count):
     # origin image size
     fig, ax = pyplot.subplots(1, 1, figsize=(10, 10))
 
@@ -32,12 +33,12 @@ def draw_imagenet_count_per_ois(imgs_save_dir, ois_to_count):
     ax.tick_params(axis='x', which='major', pad=3, labelsize=6, labelrotation=0, labelright=True, labelleft=False)
     ax.tick_params(axis='y', which='major', pad=3, labelsize=6, labelrotation=0, labelright=False, labelleft=True)
 
-    figpath = imgs_save_dir.joinpath('count_per_ois.pdf')
+    figpath = save_dir.joinpath('count_per_ois.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
 
 
-def draw_coco_count_per_bis(imgs_save_dir, bis_to_count):
+def draw_coco_count_per_bis(save_dir, bis_to_count):
     # batch image size
     fig, ax = pyplot.subplots(1, 1, figsize=(10, 10))
 
@@ -59,12 +60,12 @@ def draw_coco_count_per_bis(imgs_save_dir, bis_to_count):
     ax.tick_params(axis='x', which='major', pad=3, labelsize=6, labelrotation=0, labelright=True, labelleft=False)
     ax.tick_params(axis='y', which='major', pad=3, labelsize=6, labelrotation=0, labelright=False, labelleft=True)
 
-    figpath = imgs_save_dir.joinpath('count_per_bis.pdf')
+    figpath = save_dir.joinpath('count_per_bis.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
 
 
-def draw_mmlu_count_per_tl(imgs_save_dir, tl_to_count):
+def draw_mmlu_count_per_tl(save_dir, tl_to_count):
     # origin image size
     fig, ax = pyplot.subplots(1, 1, figsize=(10, 10))
 
@@ -86,12 +87,12 @@ def draw_mmlu_count_per_tl(imgs_save_dir, tl_to_count):
     ax.tick_params(axis='x', which='major', pad=3, labelsize=6, labelrotation=0, labelright=True, labelleft=False)
     ax.tick_params(axis='y', which='major', pad=3, labelsize=6, labelrotation=0, labelright=False, labelleft=True)
 
-    figpath = imgs_save_dir.joinpath('count_per_tl.pdf')
+    figpath = save_dir.joinpath('count_per_tl.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
 
 
-def draw_imagenet_stat(imgs_save_dir, ois_to_cts, stat_name='avgs'):
+def draw_imagenet_stat(save_dir, ois_to_cts, stat_name='avgs'):
     # 1. Draw 3D Scatter
     #    A. H > W, (x, y, z) = (H, W, stat(Time))
     #    B. H > W, (x, y, z) = (W, H, stat(Time))
@@ -152,7 +153,7 @@ def draw_imagenet_stat(imgs_save_dir, ois_to_cts, stat_name='avgs'):
     ax.tick_params(axis='z', which='major', pad=1, labelsize=6)
     ax.legend()
 
-    figpath = imgs_save_dir.joinpath(f'3d_scatter_{stat_name}.pdf')
+    figpath = save_dir.joinpath(f'3d_scatter_{stat_name}.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
 
@@ -268,12 +269,12 @@ def draw_imagenet_stat(imgs_save_dir, ois_to_cts, stat_name='avgs'):
     ax.tick_params(axis='y', which='major', pad=1, labelsize=6)
     ax.legend()
 
-    figpath = imgs_save_dir.joinpath(f'2d_scatter_{stat_name}.pdf')
+    figpath = save_dir.joinpath(f'2d_scatter_{stat_name}.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
 
 
-def draw_coco_stat(imgs_save_dir, bis_to_cts, stat_name='avgs'):
+def draw_coco_stat(save_dir, bis_to_cts, stat_name='avgs'):
     # 1. Draw 3D Scatter
     #    A. H > W, (x, y, z) = (H, W, stat(Time))
     #    B. H > W, (x, y, z) = (W, H, stat(Time))
@@ -332,7 +333,7 @@ def draw_coco_stat(imgs_save_dir, bis_to_cts, stat_name='avgs'):
     ax.tick_params(axis='z', which='major', pad=1, labelsize=6)
     ax.legend()
 
-    figpath = imgs_save_dir.joinpath(f'3d_scatter_{stat_name}.pdf')
+    figpath = save_dir.joinpath(f'3d_scatter_{stat_name}.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
 
@@ -448,12 +449,12 @@ def draw_coco_stat(imgs_save_dir, bis_to_cts, stat_name='avgs'):
     ax.tick_params(axis='y', which='major', pad=1, labelsize=6)
     ax.legend()
 
-    figpath = imgs_save_dir.joinpath(f'2d_scatter_{stat_name}.pdf')
+    figpath = save_dir.joinpath(f'2d_scatter_{stat_name}.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
 
 
-def draw_mmlu_stat(imgs_save_dir, tl_to_cts, stat_name='avgs'):
+def draw_mmlu_stat(save_dir, tl_to_cts, stat_name='avgs'):
     # 2. Draw 2D Scatter
     #    (x, y) = (Token Length, stat(Time))
     xy = list()
@@ -496,12 +497,12 @@ def draw_mmlu_stat(imgs_save_dir, tl_to_cts, stat_name='avgs'):
     ax.tick_params(axis='y', which='major', pad=1, labelsize=6)
     ax.legend()
 
-    figpath = imgs_save_dir.joinpath(f'2d_scatter_{stat_name}.pdf')
+    figpath = save_dir.joinpath(f'2d_scatter_{stat_name}.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
 
 
-def draw_imagenet_specific_stat(imgs_save_dir, ois_to_cts, ois_to_count, top=5):
+def draw_imagenet_specific_stat(save_dir, ois_to_cts, ois_to_count, top=5):
 
     def draw_essential_stat(ax, hw_e_stat, wh_e_stat, x_label):
         hw_e_i = list(range(0, len(hw_e_stat)))
@@ -533,14 +534,14 @@ def draw_imagenet_specific_stat(imgs_save_dir, ois_to_cts, ois_to_count, top=5):
                 draw_essential_stat(axes[1, 0], hw_stat['vars'], wh_stat['vars'], 'Variance')
                 draw_essential_stat(axes[1, 1], hw_stat['stds'], wh_stat['stds'], 'Standard Deviation')
 
-                figpath = imgs_save_dir.joinpath(f'specific_stat_{total_draw}_notop{index+1}_{h}-{w}_{h/w:.5f}.pdf')
+                figpath = save_dir.joinpath(f'specific_stat_{total_draw}_notop{index+1}_{h}-{w}_{h/w:.5f}.pdf')
                 fig.savefig(figpath)
                 print(f' - Fig Exported: {figpath}')
         else:
             break
 
 
-def draw_coco_specific_stat(imgs_save_dir, bis_to_cts, bis_to_count, top=5):
+def draw_coco_specific_stat(save_dir, bis_to_cts, bis_to_count, top=5):
 
     def draw_essential_stat(ax, hw_e_stat, wh_e_stat, x_label):
         hw_e_i = list(range(0, len(hw_e_stat)))
@@ -572,14 +573,14 @@ def draw_coco_specific_stat(imgs_save_dir, bis_to_cts, bis_to_count, top=5):
                 draw_essential_stat(axes[1, 0], hw_stat['vars'], wh_stat['vars'], 'Variance')
                 draw_essential_stat(axes[1, 1], hw_stat['stds'], wh_stat['stds'], 'Standard Deviation')
 
-                figpath = imgs_save_dir.joinpath(f'specific_stat_{total_draw}_notop{index+1}_{h}-{w}_{h/w:.5f}.pdf')
+                figpath = save_dir.joinpath(f'specific_stat_{total_draw}_notop{index+1}_{h}-{w}_{h/w:.5f}.pdf')
                 fig.savefig(figpath)
                 print(f' - Fig Exported: {figpath}')
         else:
             break
 
 
-def draw_mmlu_specific_stat(imgs_save_dir, tl_to_cts, tl_to_count, top=5):
+def draw_mmlu_specific_stat(save_dir, tl_to_cts, tl_to_count, top=5):
 
     def draw_essential_stat(ax, e_stat, x_label):
         e_i = list(range(0, len(e_stat)))
@@ -605,21 +606,21 @@ def draw_mmlu_specific_stat(imgs_save_dir, tl_to_cts, tl_to_count, top=5):
                 draw_essential_stat(axes[1, 0], stat['vars'], 'Variance')
                 draw_essential_stat(axes[1, 1], stat['stds'], 'Standard Deviation')
 
-                figpath = imgs_save_dir.joinpath(f'specific_stat_{total_draw}_notop{index+1}_{tl}.pdf')
+                figpath = save_dir.joinpath(f'specific_stat_{total_draw}_notop{index+1}_{tl}.pdf')
                 fig.savefig(figpath)
                 print(f' - Fig Exported: {figpath}')
         else:
             break
 
 
-def draw_ImageNet(extracted_data, combine_type, imgs_save_dir):
+def draw_ImageNet(extracted_data, combine_type, save_dir):
     main_results = extracted_data['main_results']
     origin_image_sizes = extracted_data['other_results']['origin_image_sizes']
     #inference_times = extracted_data['other_results']['inference_times']
     #preprocess_times = extracted_data['other_results']['preprocess_times']
     #postprocess_times = extracted_data['other_results']['postprocess_times']
 
-    combined_times = combine_ImageNet_times(extracted_data['other_results'], combine_type)
+    combined_times = combine_times(extracted_data['other_results'], combine_type)
 
     ois_to_cts = dict()
     for origin_image_size, combined_time in zip(origin_image_sizes, combined_times):
@@ -643,40 +644,40 @@ def draw_ImageNet(extracted_data, combine_type, imgs_save_dir):
     print(f'[Begin] Drawing ...')
 
     print(f' v Drawing ...')
-    draw_imagenet_count_per_ois(imgs_save_dir, ois_to_count)
+    draw_imagenet_count_per_ois(save_dir, ois_to_count)
     print(f' ^ Draw Count V.S. Origin Image Size Finished.\n')
 
     print(f' v Drawing ...')
-    draw_imagenet_stat(imgs_save_dir, ois_to_cts, 'avgs')
+    draw_imagenet_stat(save_dir, ois_to_cts, 'avgs')
     print(f' ^ Draw Statistics \'avg\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_imagenet_stat(imgs_save_dir, ois_to_cts, 'mins')
+    draw_imagenet_stat(save_dir, ois_to_cts, 'mins')
     print(f' ^ Draw Statistics \'min\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_imagenet_stat(imgs_save_dir, ois_to_cts, 'maxs')
+    draw_imagenet_stat(save_dir, ois_to_cts, 'maxs')
     print(f' ^ Draw Statistics \'max\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_imagenet_stat(imgs_save_dir, ois_to_cts, 'vars')
+    draw_imagenet_stat(save_dir, ois_to_cts, 'vars')
     print(f' ^ Draw Statistics \'var\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_imagenet_specific_stat(imgs_save_dir, ois_to_cts, ois_to_count, top=10)
+    draw_imagenet_specific_stat(save_dir, ois_to_cts, ois_to_count, top=10)
     print(f' ^ Draw Specific Statistics Finished.\n')
 
     print(f'[End] All Finished.')
 
 
-def draw_COCO(extracted_data, combine_type, imgs_save_dir):
+def draw_COCO(extracted_data, combine_type, save_dir):
     main_results = extracted_data['main_results']
     batch_image_sizes = extracted_data['other_results']['batch_image_sizes']
     #inference_times = extracted_data['other_results']['inference_times']
     #preprocess_times = extracted_data['other_results']['preprocess_times']
     #postprocess_times = extracted_data['other_results']['postprocess_times']
 
-    combined_times = combine_COCO_times(extracted_data['other_results'], combine_type)
+    combined_times = combine_times(extracted_data['other_results'], combine_type)
 
     bis_to_cts = dict()
     for batch_image_size, combined_time in zip(batch_image_sizes, combined_times):
@@ -700,84 +701,84 @@ def draw_COCO(extracted_data, combine_type, imgs_save_dir):
     print(f'[Begin] Drawing ...')
 
     print(f' v Drawing ...')
-    draw_coco_count_per_bis(imgs_save_dir, bis_to_count)
+    draw_coco_count_per_bis(save_dir, bis_to_count)
     print(f' ^ Draw Count V.S. Image Size Finished.\n')
 
     # print(f' v Drawing ...')
-    # draw_coco_count_per_nop(imgs_save_dir, bis_to_count)
+    # draw_coco_count_per_nop(save_dir, bis_to_count)
     # print(f' ^ Draw Count V.S. Number of Pixels Finished.\n')
 
     print(f' v Drawing ...')
-    draw_coco_stat(imgs_save_dir, bis_to_cts, 'avgs')
+    draw_coco_stat(save_dir, bis_to_cts, 'avgs')
     print(f' ^ Draw Statistics \'avg\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_coco_stat(imgs_save_dir, bis_to_cts, 'mins')
+    draw_coco_stat(save_dir, bis_to_cts, 'mins')
     print(f' ^ Draw Statistics \'min\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_coco_stat(imgs_save_dir, bis_to_cts, 'maxs')
+    draw_coco_stat(save_dir, bis_to_cts, 'maxs')
     print(f' ^ Draw Statistics \'max\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_coco_stat(imgs_save_dir, bis_to_cts, 'vars')
+    draw_coco_stat(save_dir, bis_to_cts, 'vars')
     print(f' ^ Draw Statistics \'var\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_coco_specific_stat(imgs_save_dir, bis_to_cts, bis_to_count, top=10)
+    draw_coco_specific_stat(save_dir, bis_to_cts, bis_to_count, top=10)
     print(f' ^ Draw Specific Statistics Finished.\n')
 
     print(f'[End] All Finished.')
 
 
-def draw_mmlu_task_stat(imgs_save_dir, token_lengths, combined_times, stat_name='avgs', top=5):
-    fig, axes = pyplot.subplots(1, 1, figsize=(10, 10))
-    ax = axes
+#def draw_mmlu_task_stat(save_dir, token_lengths, combined_times, stat_name='avgs', top=5):
+#    fig, axes = pyplot.subplots(1, 1, figsize=(10, 10))
+#    ax = axes
+#
+#    xticks = list()
+#    xticklabels = list()
+#    total = 0
+#    for index, (task, task_xkcd_color) in enumerate(zip(combined_times.keys(), mcolors.XKCD_COLORS.keys())):
+#        if index < top:
+#            pass
+#        else:
+#            break
+#        stat = calculate_stat(combined_times[task])
+#        tl_s = list()
+#        for tl, s in zip(token_lengths[task], stat[stat_name]):
+#            tl_s.append((tl, s))
+#
+#        tl_s = sorted(tl_s, key=lambda x: x[0])
+#        xs = list(range(total, total+len(tl_s)))
+#        ys = list()
+#        ls = list()
+#        for tl, s in tl_s:
+#            ys.append(s)
+#            ls.append(tl)
+#
+#        total += len(tl_s)
+#
+#        xticks.extend([xs[0], xs[-1]])
+#        xticklabels.extend([ls[0], ls[-1]])
+#
+#        ax.scatter(xs, ys, s=6, c=task_xkcd_color, marker="*", label=task)
+#
+#    ax.set_xlabel('Tasks with Ascending Token Length', fontsize=8)
+#    ax.set_ylabel(f'{stat_map[stat_name]} Time', fontsize=8)
+#    ax.set_title(f'{stat_map[stat_name]} time of each prompt', fontsize=8)
+#
+#    ax.set_xticks(xticks)
+#    ax.set_xticklabels(xticklabels)
+#    ax.tick_params(axis='x', which='major', pad=1, labelsize=6, rotation=45)
+#    ax.tick_params(axis='y', which='major', pad=1, labelsize=6)
+#    ax.legend()
+#
+#    figpath = save_dir.joinpath(f'task_stat_{stat_name}.pdf')
+#    fig.savefig(figpath)
+#    print(f' - Fig Exported: {figpath}')
 
-    xticks = list()
-    xticklabels = list()
-    total = 0
-    for index, (task, task_xkcd_color) in enumerate(zip(combined_times.keys(), mcolors.XKCD_COLORS.keys())):
-        if index < top:
-            pass
-        else:
-            break
-        stat = calculate_stat(combined_times[task])
-        tl_s = list()
-        for tl, s in zip(token_lengths[task], stat[stat_name]):
-            tl_s.append((tl, s))
 
-        tl_s = sorted(tl_s, key=lambda x: x[0])
-        xs = list(range(total, total+len(tl_s)))
-        ys = list()
-        ls = list()
-        for tl, s in tl_s:
-            ys.append(s)
-            ls.append(tl)
-
-        total += len(tl_s)
-
-        xticks.extend([xs[0], xs[-1]])
-        xticklabels.extend([ls[0], ls[-1]])
-
-        ax.scatter(xs, ys, s=6, c=task_xkcd_color, marker="*", label=task)
-
-    ax.set_xlabel('Tasks with Ascending Token Length', fontsize=8)
-    ax.set_ylabel(f'{stat_map[stat_name]} Time', fontsize=8)
-    ax.set_title(f'{stat_map[stat_name]} time of each prompt', fontsize=8)
-
-    ax.set_xticks(xticks)
-    ax.set_xticklabels(xticklabels)
-    ax.tick_params(axis='x', which='major', pad=1, labelsize=6, rotation=45)
-    ax.tick_params(axis='y', which='major', pad=1, labelsize=6)
-    ax.legend()
-
-    figpath = imgs_save_dir.joinpath(f'task_stat_{stat_name}.pdf')
-    fig.savefig(figpath)
-    print(f' - Fig Exported: {figpath}')
-
-
-def draw_MMLU(extracted_data, combine_type, imgs_save_dir):
+def draw_MMLU(extracted_data, combine_type, save_dir):
     main_results = extracted_data['main_results']
     tasks = extracted_data['other_results']['tasks']
     token_lengths = extracted_data['other_results']['token_lengths']
@@ -785,120 +786,89 @@ def draw_MMLU(extracted_data, combine_type, imgs_save_dir):
     #preprocess_times = extracted_data['other_results']['preprocess_times']
     #postprocess_times = extracted_data['other_results']['postprocess_times']
 
-    combined_times = combine_MMLU_times(extracted_data['other_results'], combine_type)
+    combined_times = combine_times(extracted_data['other_results'], combine_type)
 
     tl_to_cts = dict()
-    for task in tasks:
-        task_token_lengths = token_lengths[task]
-        task_combined_times = combined_times[task]
-        for token_length, combined_time in zip(task_token_lengths, task_combined_times):
-            ct = tl_to_cts.get(token_length, list())
-            ct.append(combined_time)
-            tl_to_cts[token_length] = ct
+    for token_length, combined_time in zip(token_lengths, combined_times):
+        ct = tl_to_cts.get(token_length, list())
+        ct.append(combined_time)
+        tl_to_cts[token_length] = ct
 
-        tl_to_count = dict()
-        for token_length in tl_to_cts.keys():
-            cts = tl_to_cts.get(token_length, list())
-            tl_to_count[token_length] = tl_to_count.get(token_length, 0) + len(cts)
-        tl_to_count = list(tl_to_count.items())
-        tl_to_count = sorted(tl_to_count, key=lambda x: x[1])[::-1]
+    tl_to_count = dict()
+    for token_length in tl_to_cts.keys():
+        cts = tl_to_cts.get(token_length, list())
+        tl_to_count[token_length] = tl_to_count.get(token_length, 0) + len(cts)
+    tl_to_count = list(tl_to_count.items())
+    tl_to_count = sorted(tl_to_count, key=lambda x: x[1])[::-1]
 
     print(f'[Begin] Drawing ...')
 
     print(f' v Drawing ...')
-    draw_mmlu_count_per_tl(imgs_save_dir, tl_to_count)
+    draw_mmlu_count_per_tl(save_dir, tl_to_count)
     print(f' ^ Draw Count V.S. Token Length Finished.\n')
 
     print(f' v Drawing ...')
-    draw_mmlu_stat(imgs_save_dir, tl_to_cts, 'avgs')
+    draw_mmlu_stat(save_dir, tl_to_cts, 'avgs')
     print(f' ^ Draw Statistics \'avg\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_mmlu_stat(imgs_save_dir, tl_to_cts, 'mins')
+    draw_mmlu_stat(save_dir, tl_to_cts, 'mins')
     print(f' ^ Draw Statistics \'min\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_mmlu_stat(imgs_save_dir, tl_to_cts, 'maxs')
+    draw_mmlu_stat(save_dir, tl_to_cts, 'maxs')
     print(f' ^ Draw Statistics \'max\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_mmlu_stat(imgs_save_dir, tl_to_cts, 'vars')
+    draw_mmlu_stat(save_dir, tl_to_cts, 'vars')
     print(f' ^ Draw Statistics \'var\' Finished.\n')
 
     print(f' v Drawing ...')
-    draw_mmlu_specific_stat(imgs_save_dir, tl_to_cts, tl_to_count, top=10)
+    draw_mmlu_specific_stat(save_dir, tl_to_cts, tl_to_count, top=10)
     print(f' ^ Draw Specific Statistics Finished.\n')
 
-    print(f' v Drawing ...')
-    draw_mmlu_task_stat(imgs_save_dir, token_lengths, combined_times, 'avgs', top=10)
-    print(f' ^ Draw Statistics \'var\' Finished.\n')
+    #print(f' v Drawing ...')
+    #draw_mmlu_task_stat(save_dir, token_lengths, combined_times, 'avgs', top=10)
+    #print(f' ^ Draw Statistics \'var\' Finished.\n')
 
     print(f'[End] All Finished.')
 
 
-def draw(extracted_data, dataset_type, combine_type, imgs_save_dir):
+def draw(extracted_data, dataset_type, combine_type, save_dir):
     assert dataset_type in dataset_choices, f"Wrong Type of Dataset: {dataset_type}"
     assert combine_type in combine_choices, f"Wrong Type of Combine: {combine_type}"
 
     draw_by_dst = globals()['draw_' + dataset_type]
-    draw_by_dst(extracted_data, combine_type, imgs_save_dir)
+    draw_by_dst(extracted_data, combine_type, save_dir)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Draw Figs for Datasets')
 
-    parser.add_argument('-i', '--imgs-save-dir', type=str, required=True)
+    parser.add_argument('-s', '--save-dir', type=str, required=True)
 
-    parser.add_argument('-d', '--data-dir', type=str, default=None)
-    parser.add_argument('-n', '--data-filename', type=str, default=None)
-    parser.add_argument('-s', '--save-dir', type=str, default=None)
-    parser.add_argument('-f', '--save-filename', type=str, default=None)
-    parser.add_argument('-p', '--npz-path', type=str, default=None)
+    parser.add_argument('-d', '--data-dir', type=str, required=True)
+    parser.add_argument('-n', '--data-filename', type=str, required=True)
+
     parser.add_argument('-t', '--dataset-type', type=str, default='ImageNet', choices=dataset_choices)
     parser.add_argument('-c', '--combine-type', type=str, default='i', choices=combine_choices)
     arguments = parser.parse_args()
 
     combine_type = arguments.combine_type
-    assert combine_type in combine_choices, f"No Such Combine Type: {combine_type}"
-
     dataset_type = arguments.dataset_type
-    assert dataset_type in dataset_choices, f"No Such Dataset Type: {dataset_type}"
 
-    imgs_save_dir = pathlib.Path(arguments.imgs_save_dir)
+    save_dir = pathlib.Path(arguments.save_dir)
 
-    if not imgs_save_dir.is_dir():
-        print(f"No Imgs Save Dir Exists: {imgs_save_dir}, now creating it.")
-        imgs_save_dir.mkdir(parents=True, exist_ok=True)
+    if not save_dir.is_dir():
+        print(f"No Imgs Save Dir Exists: {save_dir}, now creating it.")
+        save_dir.mkdir(parents=True, exist_ok=True)
 
-    if arguments.data_dir is None:
-        # Direct Load From NPZ
-        if arguments.npz_path is None:
-            raise AttributeError("At least one argument of \{--data-dir or --npz-path\} must be specified.")
-        else:
-            npz_path = pathlib.Path(arguments.npz_path)
-            assert npz_path.is_file(), f"No Such NPZ File: {npz_path}"
-            extracted_data = numpy.load(npz_path)
-    else:
-        # Load From Raw Data
-        data_dir = pathlib.Path(arguments.data_dir)
-        data_filename = arguments.data_filename
-        assert data_dir.is_dir(), f"No Such Data Dir: {data_dir}"
-        assert data_filename is not None, f"While using argument \'--data-dir\', one must specify \'--data-filename\'"
+    # Load From Raw Data
+    data_dir = pathlib.Path(arguments.data_dir)
+    data_filename = arguments.data_filename
+    assert data_dir.is_dir(), f"No Such Data Dir: {data_dir}"
+    assert data_filename is not None, f"While using argument \'--data-dir\', one must specify \'--data-filename\'"
 
-        from extract_data import extract_data
-        extracted_data = extract_data(data_dir, data_filename, dataset_type)
+    extracted_data = extract_data(data_dir, data_filename, dataset_type)
 
-        if arguments.save_dir is None:
-            print(f"The extracted data will not be saved!\n")
-            print(f"If one want to save the extracted data, please specify arguments \'--save-dir\' and \'--save-filename\'")
-        else:
-            save_dir = pathlib.Path(arguments.save_dir)
-            save_filename = arguments.save_filename
-            assert save_dir.is_dir(), f"No Such Save Dir: {save_dir}"
-            assert save_filename is not None, f"While using argument \'--save-dir\', one must specify \'--save-filename\'"
-            save_filepath = save_dir.joinpath(save_filename)
-            print(f" + Saving data into \'{save_filepath}.npz\' ...")
-            numpy.savez(save_filepath, **extracted_data)
-            print(f" - Saved.")
-
-    draw(extracted_data, dataset_type, combine_type, imgs_save_dir)
+    draw(extracted_data, dataset_type, combine_type, save_dir)
