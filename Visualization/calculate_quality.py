@@ -1,7 +1,7 @@
 import io
 import sys
-import json
 import numpy
+import scipy
 import pathlib
 import argparse
 
@@ -11,6 +11,8 @@ from constant import dataset_choices, combine_choices, quality_choices
 
 def calculate_stat(cts):
     if len(cts):
+        kurts = scipy.stats.kurtosis(cts, axis=-1, bias=False, fisher=True)
+        skews = scipy.stats.skew(cts, axis=-1, bias=False)
         mins = numpy.min(cts, axis=-1)
         maxs = numpy.max(cts, axis=-1)
         meds = numpy.median(cts, axis=-1)
@@ -23,6 +25,8 @@ def calculate_stat(cts):
         lower_whiskers = q1s - 1.5 * iqrs
         upper_whiskers = q3s + 1.5 * iqrs
     else:
+        kurts = numpy.array([])
+        skews = numpy.array([])
         mins = numpy.array([])
         maxs = numpy.array([])
         meds = numpy.array([])
@@ -36,6 +40,8 @@ def calculate_stat(cts):
         upper_whiskers = numpy.array([])
 
     return dict(
+        kurts = kurts,
+        skews = skews,
         mins = mins,
         maxs = maxs,
         meds = meds,

@@ -1,7 +1,8 @@
+detect_choices = ['slide', 'cumulate']
 quality_choices = ['acc', 'map', 'wf1']
 dataset_choices = ['ImageNet', 'COCO', 'MMLU', 'MELD']
 combine_choices = ['i', 'ip', 'pi', 'pip'] # inf, inf->post, pre->inf, pre->inf->post
-rm_outs_choices = ['quantile', 'gaussian']
+rm_outs_choices = ['quantile', 'gaussian', 'median', 'none']
 quality_map = dict(
     acc = 'Acc',
     map = 'mAP',
