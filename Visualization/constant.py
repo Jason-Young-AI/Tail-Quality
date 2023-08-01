@@ -1,3 +1,6 @@
+fit_choices = ['gmm', 'kde']
+level_choices = ['specific', 'i100', 'i95', 'i90', 'i85', 'i80']
+kernel_choices = ['gaussian', 'tophat', 'epanechnikov', 'exponential', 'linear', 'cosine']
 detect_choices = ['slide', 'cumulate']
 quality_choices = ['acc', 'map', 'wf1']
 dataset_choices = ['ImageNet', 'COCO', 'MMLU', 'MELD']

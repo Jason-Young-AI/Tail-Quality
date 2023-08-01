@@ -1,13 +1,16 @@
+import scipy
 import numpy
 import pathlib
 import argparse
 
 from calculate_quality import combine_times, calculate_stat
 from extract_data import extract_data
-from constant import dataset_choices, combine_choices, rm_outs_choices, detect_choices
+from constant import dataset_choices, combine_choices, rm_outs_choices, detect_choices, level_choices
 
 
 def remove_outliers(new_times, new_stats, outliers_mode):
+    instance_number, run_number = new_times.shape
+    outlier_flags = numpy.array([[False for _ in range(run_number)] for i in range(instance_number)])
     if outliers_mode == 'quantile':
         q1s = new_stats['q1s'].reshape(-1, 1)
         q3s = new_stats['q3s'].reshape(-1, 1)
@@ -113,7 +116,7 @@ def check_minimum_n(times, thresholds=[0.01, 0.01, 0.01, 0.01, 0.01], outliers_m
 
         total_suf = numpy.where(suf_flag & ~fin, total_suf, 0) # if not suf, total_suf set to 0, else keep
 
-        print(f"No.{try_i+1}/{run_number - init_num}. Finish: {numpy.sum(fin)}; This Finish: {total_suf_num}; q1s: {q1s_suf_num}; q3s: {q3s_suf_num}; meds: {meds_suf_num}; avgs: {avgs_suf_num}; vars: {vars_suf_num}.")
+        print(f" - No.{try_i+1}/{run_number - init_num}. Finish: {numpy.sum(fin)}/{len(fin)}; This Finish: {total_suf_num}; q1s: {q1s_suf_num}; q3s: {q3s_suf_num}; meds: {meds_suf_num}; avgs: {avgs_suf_num}; vars: {vars_suf_num}.")
         fin_nums.append(numpy.sum(fin))
         #if q1s_suf and q3s_suf and meds_suf and avgs_suf and vars_suf:
         #    total_suf += 1
@@ -134,6 +137,39 @@ def check_minimum_n(times, thresholds=[0.01, 0.01, 0.01, 0.01, 0.01], outliers_m
     return minimum_n, numpy.array(fin_nums)
 
 
+def check_common_dist(times, minimum_n, outliers_mode='quantile'):
+    dist_names = [
+        'norm',
+        #'expon',
+        #'logistic',
+        #'gumbel',
+    ]
+    matches = dict()
+    for dist_name in dist_names:
+        print(f"Checking for distribution: {dist_name} ...")
+        matches[dist_name] = list()
+        for index, (ins_times, ins_n) in enumerate(zip(times, minimum_n)):
+            # ins_time: [run_number]
+            r_times = ins_times[:ins_n].reshape(1, -1) # r_times: [1, run_number]
+            outlier_flags = remove_outliers(r_times, calculate_stat(r_times), outliers_mode)
+            result = scipy.stats.anderson(r_times[~outlier_flags], dist=dist_name)
+            rejects = result.statistic > result.critical_values
+            for reject, sig, cri in zip(rejects[::-1], result.significance_level[::-1], result.critical_values[::-1]):
+                if reject:
+                    pass
+                else:
+                    print(f" - No.{index+1}/{len(minimum_n)} instance (with {ins_n} run) can not reject H0 for the corresponding significance level {sig}: {result.statistic} < {cri}")
+                    matches[dist_name].append(index)
+                    break
+
+    print(f"Check Non-Parameter Est Flags")
+    np_fit = numpy.ones((len(minimum_n), len(dist_names)), dtype=bool)
+    for i, dist_name in enumerate(dist_names):
+        for index in matches[dist_name]:
+            np_fit[index, i] = False
+    return np_fit
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Calculate Quality')
     parser.add_argument('-d', '--data-dir', type=str, required=True)
@@ -141,6 +177,11 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--thresholds', type=float, nargs='+', default=[0.01, 0.01, 0.01, 0.01, 0.01])
     parser.add_argument('-l', '--tolerance', type=int, default=10)
     parser.add_argument('-i', '--init-num', type=int, default=30)
+    parser.add_argument('-u', '--check-npz-path', type=str, default=None)
+
+    parser.add_argument('-k', '--check-min-n', action='store_true')
+    parser.add_argument('-e', '--n-level', type=str, default='specific', choices=level_choices)
+
 
     parser.add_argument('-m', '--detect-type', type=str, default='cumulate', choices=detect_choices)
     parser.add_argument('-s', '--dataset-type', type=str, default='ImageNet', choices=dataset_choices)
@@ -168,10 +209,47 @@ if __name__ == "__main__":
     extracted_data = extract_data(data_dir, data_filename, dataset_type)
     combined_times = combine_times(extracted_data['other_results'], combine_type)
 
-    minimum_n, fin_nums = check_minimum_n(combined_times, thresholds=thresholds, tolerance=tolerance, detect_type=detect_type, init_num=init_num)
-    i95 = numpy.sum((fin_nums < numpy.floor(0.95 * combined_times.shape[0]))) + init_num
-    i90 = numpy.sum((fin_nums < numpy.floor(0.90 * combined_times.shape[0]))) + init_num
-    i85 = numpy.sum((fin_nums < numpy.floor(0.85 * combined_times.shape[0]))) + init_num
-    i80 = numpy.sum((fin_nums < numpy.floor(0.80 * combined_times.shape[0]))) + init_num
-    print(f"Need total run(instance): {numpy.sum(minimum_n)}.")
-    print(f"Need total run(dataset): {i95} (95%); {i90} (90%); {i85} (85%); {i80} (80%).")
+    for ct in combined_times[4823]:
+        print(f"{ct}\t")
+
+    instance_number, run_number = combined_times.shape
+    minimum_n = numpy.array([run_number for _ in range(instance_number)])
+    dataset_minimum_n = dict(
+        i100 = run_number,
+        i95 = run_number,
+        i90 = run_number,
+        i85 = run_number,
+        i80 = run_number,
+    )
+    if arguments.check_min_n:
+        minimum_n, fin_nums = check_minimum_n(combined_times, thresholds=thresholds, tolerance=tolerance, detect_type=detect_type, init_num=init_num)
+        i95 = numpy.sum((fin_nums < numpy.floor(0.95 * combined_times.shape[0]))) + init_num
+        i90 = numpy.sum((fin_nums < numpy.floor(0.90 * combined_times.shape[0]))) + init_num
+        i85 = numpy.sum((fin_nums < numpy.floor(0.85 * combined_times.shape[0]))) + init_num
+        i80 = numpy.sum((fin_nums < numpy.floor(0.80 * combined_times.shape[0]))) + init_num
+        dataset_minimum_n['i95'] = i95
+        dataset_minimum_n['i90'] = i90
+        dataset_minimum_n['i85'] = i85
+        dataset_minimum_n['i80'] = i80
+        print(f"Need total run(instance): {numpy.sum(minimum_n)}.")
+        print(f"Need total run(dataset): {i95} (95%); {i90} (90%); {i85} (85%); {i80} (80%).")
+
+    if arguments.n_level == 'specific':
+        min_ns = minimum_n
+    else:
+        min_ns = numpy.array([dataset_minimum_n[arguments.n_level] for _ in range(combined_times.shape[0])])
+
+    np_fit = check_common_dist(combined_times, min_ns, outliers_mode='none')
+
+    check_data = dict(
+        min_ns = minimum_n,
+        np_fit = np_fit,
+        **dataset_minimum_n,
+    )
+
+    if arguments.check_npz_path is not None:
+        check_npz_path = pathlib.Path(arguments.check_npz_path)
+        check_npz_path = check_npz_path.with_suffix('.npz')
+        print(f" + Saving check results into \'{check_npz_path}' ...")
+        numpy.savez(check_npz_path, **check_data)
+        print(f" - Saved.")
