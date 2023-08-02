@@ -7,6 +7,16 @@ import argparse
 from constant import dataset_choices
 
 
+def get_main_record(xs, batch_size):
+    main_xs = list()
+    for i, x in enumerate(xs):
+        if i % batch_size == 0:
+            main_xs.append(x)
+    if isinstance(xs, numpy.ndarray):
+        return numpy.array(main_xs)
+    return main_xs
+
+
 def filename_match_pattern(filename, pattern):
     regex = re.compile(pattern)
     return bool(regex.match(filename))

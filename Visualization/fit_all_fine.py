@@ -1,4 +1,5 @@
 import time
+import scipy
 import numpy
 import pickle
 import pathlib
@@ -10,9 +11,11 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.neighbors import KernelDensity
 from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import GridSearchCV
+from scipy.spatial.distance import jensenshannon
+from sklearn.linear_model import LinearRegression
 
 from calculate_quality import combine_times, calculate_stat
-from extract_data import extract_data
+from extract_data import extract_data, get_main_record
 from constant import dataset_choices, combine_choices, rm_outs_choices, kernel_choices, level_choices, fit_choices
 
 
@@ -36,45 +39,71 @@ def remove_outliers(new_times, new_stats, outliers_mode):
     return outlier_flags
 
 
-def fit(ins_times, fit_type='gmm'):
-    if fit_type == 'gmm':
-        ns = list(range(1, 11))
-        models = [GaussianMixture(n_components=n, covariance_type='full', random_state=0).fit(ins_times) for n in ns]
-        bics = [model.bic(ins_times) for model in models]
-        scores = [model.score(ins_times) for model in models]
-        id = numpy.argmin(bics)
-        best_model = models[id]
-        best_p = ns[id]
-        score = scores[id]
-    if fit_type == 'kde':
-        params = {'bandwidth': numpy.logspace(-4, 0, 30)}
-        grid = GridSearchCV(KernelDensity(kernel='gaussian'), params, cv=5)
-        grid.fit(ins_times)
-        best_model = grid.best_estimator_
-        best_p = grid.best_params_['bandwidth']
-        score = best_model.score(ins_times)
+def gmm_aic(n_components, ins_times):
+    gmm = GaussianMixture(n_components=n_components)
+    gmm.fit(ins_times)
+    return gmm.aic(ins_times)
 
-    return best_model, best_p, score
+
+def kde_aic(bandwidth, ins_times):
+    kde = KernelDensity(bandwidth=bandwidth)
+    kde.fit(ins_times)
+    log_likelihood = kde.score(ins_times)
+    num_params = 2  # KDE has two parameters: bandwidth and kernel
+    num_samples = ins_times.shape[0]
+    return -2 * log_likelihood + 2 * num_params + (2 * num_params * (num_params + 1)) / (num_samples - num_params - 1)
+
+
+def fit(ins_times, fit_type='kde'):
+    ins_times = ins_times.reshape(-1, 1)
+    if fit_type == 'kde':
+        bandwidth_grid = [0.005, 0.01, 0.03, 0.07, 0.1]
+        best_bandwidth  = min(bandwidth_grid, key=lambda x: kde_aic(x, ins_times))
+        model = KernelDensity(bandwidth=best_bandwidth).fit(ins_times)
+    if fit_type == 'gmm':
+        n_components_grid = [2, 3, 4, 5, 6]
+        best_n_components = min(n_components_grid, key=lambda x: gmm_aic(x, ins_times))
+        model = GaussianMixture(n_components=best_n_components).fit(ins_times)
+    return model
+
+
+def check_all_jsdis(check_model, models, ins_times):
+    js_dis = list()
+    x = numpy.linspace(ins_times.min(), ins_times.max(), 1000).reshape(-1, 1)
+    for model in models:
+        js_dis.append(jensenshannon(numpy.exp(check_model.score_samples(x)), numpy.exp(model.score_samples(x))))
+
+    if len(js_dis) == 0:
+        js_dis = [1,]
+
+    return js_dis
 
 
 def get_gaussian(ins_imes):
-    return calculate_stat(ins_times)
+    stat = calculate_stat(ins_times)
+    model = scipy.stats.norm(loc=stat['avgs'][0], scale=stat['stds'][0])
+    return model
 
 
 def fit_all(times, min_ns, np_fit, fit_type):
     tic = time.perf_counter()
-    all_dist = list()
+    models = list()
+    model_types = list()
     for index, (ins_times, min_n, ins_np_fit) in enumerate(zip(times, min_ns, np_fit)):
-        if numpy.sum(ins_np_fit) != 0:
+        ins_times = ins_times[:min_n].reshape(-1, 1)
+        if ins_np_fit:
             print(f"No.{index} Fitting.")
-            ins_times = ins_times[:min_n].reshape(-1, 1)
-            all_dist.append(fit(ins_times, fit_type))
+            best_model = fit(ins_times, fit_type)
+            models.append(best_model)
+            model_types.append(fit_type)
         else:
             print(f"No.{index} Gaussian.")
-            all_dist.append(get_gaussian(ins_times))
+            models.append(get_gaussian(ins_times))
+            model_types.append('gau')
             
     toc = time.perf_counter()
     print(f"Total time consume: {toc-tic:.2f}s")
+    return models, model_types
 
 
 if __name__ == "__main__":
@@ -82,19 +111,31 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--data-dir', type=str, required=True)
     parser.add_argument('-n', '--data-filename', type=str, required=True)
     parser.add_argument('-u', '--check-npz-path', type=str, required=True)
+    parser.add_argument('-b', '--batch-size', type=int, required=True)
 
     parser.add_argument('-f', '--fit-npz-path', type=str, default=None)
 
     parser.add_argument('-e', '--n-level', type=str, default='specific', choices=level_choices)
+    parser.add_argument('-l', '--i100-n', type=int, default=80)
 
-    parser.add_argument('-m', '--fit-type', type=str, default='gmm', choices=fit_choices)
+    parser.add_argument('-m', '--fit-type', type=str, default='kde', choices=fit_choices)
 
     parser.add_argument('-s', '--dataset-type', type=str, default='ImageNet', choices=dataset_choices)
     parser.add_argument('-c', '--combine-type', type=str, default='i', choices=combine_choices)
     parser.add_argument('-r', '--rm-outs-type', type=str, default='none', choices=rm_outs_choices)
 
-    parser.add_argument('--instance-index', type=int, default=-1)
+    parser.add_argument('-v', '--save-dir', type=str, default=None)
+    parser.add_argument('-z', '--name', type=str, default=None)
+
+    parser.add_argument('--instance-indices', type=int, nargs='+', default=[-1, -1, -1])
     arguments = parser.parse_args()
+
+    if arguments.instance_indices[0] != -1:
+        save_dir = pathlib.Path(arguments.save_dir)
+
+        if not save_dir.is_dir():
+            print(f"No Imgs Save Dir Exists: {save_dir}, now creating it.")
+            save_dir.mkdir(parents=True, exist_ok=True)
 
     fit_type = arguments.fit_type
 
@@ -113,28 +154,52 @@ if __name__ == "__main__":
 
     extracted_data = extract_data(data_dir, data_filename, dataset_type)
     combined_times = combine_times(extracted_data['other_results'], combine_type)
+    combined_times = get_main_record(combined_times, arguments.batch_size)
 
     if arguments.n_level == 'specific':
         min_ns = check_data['min_ns']
     else:
-        min_ns = numpy.array([check_data[arguments.n_level] for _ in range(combined_times.shape[0])])
+        if arguments.n_level == 'i100':
+            min_ns = numpy.array([arguments.i100_n for _ in range(combined_times.shape[0])])
+        else:
+            min_ns = numpy.array([check_data[arguments.n_level] for _ in range(combined_times.shape[0])])
 
-    if arguments.instance_index != -1:
-        ins_times = combined_times[arguments.instance_index].reshape(-1, 1)
-        best_model, best_p, score = fit(ins_times, fit_type)
-        xs = numpy.linspace(numpy.min(ins_times), numpy.max(ins_times), num=1000).reshape(-1, 1)
-        ys = numpy.exp(best_model.score_samples(xs))
+    assert len(arguments.instance_indices) == 3
+    if arguments.instance_indices[0] != -1:
+        models = list()
+        fig, axes = plt.subplots(2, 2, figsize=(20, 20))
+        i_str = ""
+        all_ins_times = dict()
+        for index, i in enumerate(arguments.instance_indices):
+            ax = axes[index//2, index%2]
+            ins_times = combined_times[i].reshape(-1, 1)
+            best_model = fit(ins_times, fit_type)
+            models.append(best_model)
+            xs = numpy.linspace(numpy.min(ins_times), numpy.max(ins_times), num=1000)
+            ys = numpy.exp(best_model.score_samples(xs.reshape(-1, 1)))
 
-        plt.plot(xs, ys, color='xkcd:azure')
-        plt.title(f'Kernel Density Estimation at {arguments.instance_index}')
-        plt.xlabel('Value')
-        plt.ylabel('Density')
-        plt.grid(True)
-        plt.show()
+            ax.hist(ins_times, bins=30, alpha=0.5, density=True)
+            ax.plot(xs, ys, color='xkcd:azure')
+            ax.set_title(f'Time Distribution for Instance {i}')
+            ax.set_xlabel('Time')
+            ax.set_ylabel('Density')
+            i_str += f"_{i}"
+            all_ins_times[f'{arguments.name}-{i}'] = ins_times.flatten()
+
+        print(f' - JS-Dis: ')
+        for index, model in enumerate(models):
+            print(f'  {index}: {check_all_jsdis(model, models, combined_times)}')
+
+        timpath = save_dir.joinpath(f'{arguments.name}.npz')
+        numpy.savez(timpath, **all_ins_times)
+        print(f' - Times Exported: {timpath}')
+        figpath = save_dir.joinpath(f'{arguments.name}{i_str}.pdf')
+        fig.savefig(figpath)
+        print(f' - Fig Exported: {figpath}')
     else:
         all_fit = fit_all(combined_times, min_ns, check_data['np_fit'], fit_type)
 
-        assert arguments.kdefit_npz_path is not None
-        kdefit_npz_path = pathlib.Path(arguments.kdefit_npz_path)
-        with open(kdefit_npz_path, 'wb') as file:
+        assert arguments.fit_npz_path is not None
+        fit_npz_path = pathlib.Path(arguments.fit_npz_path)
+        with open(fit_npz_path, 'wb') as file:
             pickle.dump(all_fit, file)
