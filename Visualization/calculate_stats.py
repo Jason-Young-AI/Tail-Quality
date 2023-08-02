@@ -63,9 +63,10 @@ def fit(ins_times, fit_type='kde'):
 
 def check_all_jsdis(check_model, models, ins_times):
     js_dis = list()
+    epsilon = 1e-8
     x = numpy.linspace(ins_times.min(), ins_times.max(), 1000).reshape(-1, 1)
     for model in models:
-        js_dis.append(jensenshannon(numpy.exp(check_model.score_samples(x)), numpy.exp(model.score_samples(x))))
+        js_dis.append(jensenshannon(numpy.exp(check_model.score_samples(x))+epsilon, numpy.exp(model.score_samples(x))+epsilon))
 
     if len(js_dis) == 0:
         js_dis = [1,]

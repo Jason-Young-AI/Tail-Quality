@@ -6,8 +6,6 @@ import pathlib
 import argparse
 
 import matplotlib.pyplot as plt
-from matplotlib import cm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from sklearn.metrics import mean_absolute_error
 from sklearn.neighbors import KernelDensity
@@ -18,7 +16,7 @@ from sklearn.linear_model import LinearRegression
 
 from calculate_quality import combine_times, calculate_stat
 from extract_data import extract_data, get_main_record
-from constant import dataset_choices, combine_choices, rm_outs_choices, kernel_choices, level_choices, fit_choices
+from constant import dataset_choices, combine_choices, rm_outs_choices, kernel_choices, level_choices, fit_choices, fit_map
 
 
 def remove_outliers(new_times, new_stats, outliers_mode):
@@ -69,6 +67,25 @@ def fit(ins_times, fit_type='kde'):
     return model
 
 
+def check_all_jsdis(check_model, models, ins_times):
+    js_dis = list()
+    x = numpy.linspace(ins_times.min(), ins_times.max(), 1000).reshape(-1, 1)
+    epsilon = 1e-8
+    for model in models:
+        js_dis.append(jensenshannon(numpy.exp(check_model.score_samples(x))+epsilon, numpy.exp(model.score_samples(x))+epsilon))
+
+    if len(js_dis) == 0:
+        js_dis = [1,]
+
+    return js_dis
+
+
+def get_gaussian(ins_imes):
+    stat = calculate_stat(ins_times)
+    model = scipy.stats.norm(loc=stat['avgs'][0], scale=stat['stds'][0])
+    return model
+
+
 def get_model_pdf(x, model, model_type):
     if model_type in ['kde', 'gmm']:
         ps = numpy.exp(model.score_samples(x))
@@ -78,66 +95,20 @@ def get_model_pdf(x, model, model_type):
     return ps
 
 
-def check_all_jsdis(check_model, check_model_type, models, model_types, ins_times):
-    js_dis = list()
-    epsilon = 1e-8
-    x = numpy.linspace(ins_times.min(), ins_times.max(), 1000).reshape(-1, 1)
-    for model, model_type in zip(models, model_types):
-        js_dis.append(jensenshannon(get_model_pdf(x, check_model, check_model_type)+epsilon, get_model_pdf(x, model, model_type)+epsilon))
-
-    if len(js_dis) == 0:
-        js_dis = [1,]
-
-    return js_dis
-
-
-def get_gaussian(ins_times):
-    stat = calculate_stat(ins_times)
-    model = scipy.stats.norm(loc=stat['avgs'][0], scale=stat['stds'][0])
-    return model
-
-
-def fit_all(times, min_ns, np_fit, fit_type):
-    tic = time.perf_counter()
-    models = list()
-    model_types = list()
-    for index, (ins_times, min_n, ins_np_fit) in enumerate(zip(times, min_ns, np_fit)):
-        ins_times = ins_times[:min_n].reshape(-1, 1)
-        if ins_np_fit:
-            print(f"No.{index+1} Fitting.")
-            best_model = fit(ins_times, fit_type)
-            models.append(best_model)
-            model_types.append(fit_type)
-        else:
-            print(f"No.{index+1} Gaussian.")
-            models.append(get_gaussian(ins_times))
-            model_types.append('gau')
-            
-    toc = time.perf_counter()
-    print(f"Total time consume: {toc-tic:.2f}s")
-    return models, model_types
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Calculate Quality')
     parser.add_argument('-v', '--save-dir', type=str, required=True)
 
     parser.add_argument('-d', '--data-dir', type=str, required=True)
     parser.add_argument('-n', '--data-filename', type=str, required=True)
-    parser.add_argument('-u', '--check-npz-path', type=str, required=True)
     parser.add_argument('-b', '--batch-size', type=int, required=True)
-
-    parser.add_argument('-f', '--fit-npz-path', type=str, default=None)
-
-    parser.add_argument('-e', '--n-level', type=str, default='specific', choices=level_choices)
-    parser.add_argument('-l', '--i100-n', type=int, default=80)
 
     parser.add_argument('-m', '--fit-type', type=str, default='kde', choices=fit_choices)
 
     parser.add_argument('-s', '--dataset-type', type=str, default='ImageNet', choices=dataset_choices)
     parser.add_argument('-c', '--combine-type', type=str, default='i', choices=combine_choices)
-    parser.add_argument('-r', '--rm-outs-type', type=str, default='none', choices=rm_outs_choices)
 
+    parser.add_argument('--instance-indices', type=int, nargs='+', default=[-1,])
     arguments = parser.parse_args()
 
     save_dir = pathlib.Path(arguments.save_dir)
@@ -150,74 +121,50 @@ if __name__ == "__main__":
 
     dataset_type = arguments.dataset_type
     combine_type = arguments.combine_type
-    rm_outs_type = arguments.rm_outs_type
 
     data_dir = pathlib.Path(arguments.data_dir)
     data_filename = arguments.data_filename
     assert data_dir.is_dir(), f"No Such Data Dir: {data_dir}"
 
-    check_npz_path = pathlib.Path(arguments.check_npz_path)
-    check_npz_path = check_npz_path.with_suffix('.npz')
-    check_data = numpy.load(check_npz_path)
-    print(f"Loaded Check NPZ File: {check_npz_path}")
-
     extracted_data = extract_data(data_dir, data_filename, dataset_type)
     combined_times = combine_times(extracted_data['other_results'], combine_type)
     combined_times = get_main_record(combined_times, arguments.batch_size)
-    if dataset_type == 'ImageNet':
-        origin_image_sizes = get_main_record(extracted_data['other_results']['origin_image_sizes'], arguments.batch_size)
-        instance_sizes = numpy.prod(origin_image_sizes, axis=-1)
 
-    if dataset_type == 'COCO':
-        batch_image_sizes = get_main_record(extracted_data['other_results']['batch_image_sizes'], arguments.batch_size)
-        instance_sizes = numpy.prod(batch_image_sizes, axis=-1)
-
-    if dataset_type == 'MMLU':
-        token_lengths = get_main_record(extracted_data['other_results']['token_lengths'], arguments.batch_size)
-        instance_sizes = numpy.array(token_lengths)
-
-
-    if arguments.n_level == 'specific':
-        min_ns = check_data['min_ns']
-    else:
-        if arguments.n_level == 'i100':
-            min_ns = numpy.array([arguments.i100_n for _ in range(combined_times.shape[0])])
-        else:
-            min_ns = numpy.array([check_data[arguments.n_level] for _ in range(combined_times.shape[0])])
-
-    models, model_types = fit_all(combined_times, min_ns, check_data['np_fit'], fit_type)
-
-    all_jsdis = list()
-    total_avg_jsdis = 0
-    for index, (model, model_type) in enumerate(zip(models, model_types)):
-        this_jsdis = numpy.array(check_all_jsdis(model, model_type, models, model_types, combined_times))
-        #print(this_jsdis)
-        all_jsdis.append(this_jsdis)
-        this_avg_jsdis = numpy.sum(this_jsdis) / (len(models) - 1)
-        total_avg_jsdis += this_avg_jsdis
-        print(f"No.{index+1} JS-Dis Calculated: Avg={this_avg_jsdis}; Avg_Time:{numpy.average(combined_times[index])}.")
-
-    total_avg_jsdis = total_avg_jsdis / len(models)
-    print(f"Total Average JS-Dis: {total_avg_jsdis}")
-
-    all_jsdis = numpy.array(all_jsdis)
-
+    models = list()
     fig, axes = plt.subplots(1, 1, figsize=(10, 10))
+    i_str = ""
+    all_ins_times = combined_times[arguments.instance_indices]
+    avg_times = calculate_stat(all_ins_times)['avgs']
+    min_avg_time = numpy.min(avg_times)
+    xs = numpy.linspace(numpy.min(all_ins_times), numpy.max(all_ins_times), num=1000)
+
     ax = axes
+    for order, (index, ins_times, avg_time) in enumerate(zip(arguments.instance_indices, all_ins_times, avg_times)):
+        ins_times = all_ins_times[order].reshape(-1, 1)
+        ins_times = ins_times - avg_time + min_avg_time
+        best_model = fit(ins_times, fit_type)
+        models.append(best_model)
+        this_xs = xs - avg_time + min_avg_time
+        ys = get_model_pdf(this_xs.reshape(-1, 1), best_model, fit_type)
 
-    im = ax.imshow(all_jsdis, cmap=cm.coolwarm)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
+        ax.hist(ins_times, bins=30, alpha=0.5, density=True, label=f'Image {index}')
+        ax.plot(xs, ys, color='xkcd:azure', label=f'{fit_map[fit_type]} {index}')
+        i_str += f"_{index}"
+    
+    colors = ['blue', 'orange', 'green', 'red', 'purple', 'brown']
+    for i, line in enumerate(ax.lines):
+        if i == len(arguments.instance_indices):
+            break
+        line.set_color(colors[i])
 
-    plt.colorbar(im, cax=cax)
-    #cbar = fig.colorbar(ax, ticks=[0, 1])
-    #cbar.ax.set_yticklabels(['0', '1'])
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Density')
+    ax.legend()
 
-    figpath = save_dir.joinpath(f'js_heat_map.pdf')
+    print(f' - JS-Dis: ')
+    for order, (index, model) in enumerate(zip(arguments.instance_indices, models)):
+        print(f'  Ins:{index} - {check_all_jsdis(model, models, all_ins_times[order])}')
+
+    figpath = save_dir.joinpath(f'fit{i_str}.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
-
-    assert arguments.fit_npz_path is not None
-    fit_npz_path = pathlib.Path(arguments.fit_npz_path)
-    with open(fit_npz_path, 'wb') as file:
-        pickle.dump((models, model_types), file)

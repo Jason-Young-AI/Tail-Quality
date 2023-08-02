@@ -1,3 +1,8 @@
+fit_map = dict(
+    gmm = 'GMM',
+    kde = 'KDE',
+    gau = 'Gaussian',
+)
 fit_choices = ['gmm', 'kde']
 level_choices = ['specific', 'i100', 'i95', 'i90', 'i85', 'i80']
 kernel_choices = ['gaussian', 'tophat', 'epanechnikov', 'exponential', 'linear', 'cosine']
