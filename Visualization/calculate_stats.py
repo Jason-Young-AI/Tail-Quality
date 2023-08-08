@@ -74,7 +74,7 @@ def check_all_jsdis(check_model, models, ins_times):
     return js_dis
 
 
-def check_minimum_n(times, thresholds=[0.01, 0.01, 0.01, 0.01, 0.01], outliers_mode='quantile', tolerance=10, detect_type='slide', init_num=30, using_stat=False, fit_type='kde'):
+def check_minimum_n(times, thresholds=[0.01, 0.01, 0.01, 0.01, 0.01], outliers_mode='quantile', tolerance=10, detect_type='slide', init_num=30, using_stat=False, fit_type='kde', step=10):
     instance_number, run_number = times.shape
     total_suf = numpy.array([0 for _ in range(instance_number)])
     fin = numpy.array([False for _ in range(instance_number)])
@@ -88,7 +88,7 @@ def check_minimum_n(times, thresholds=[0.01, 0.01, 0.01, 0.01, 0.01], outliers_m
         all_models = [list() for _ in range(instance_number)]
         jsdiss = list()
     fin_nums = list()
-    for try_i, new_n in enumerate(range(stay_n+1, run_number+1)):
+    for try_i, new_n in enumerate(range(stay_n+step, run_number+step, step)):
         if detect_type == 'slide':
             new_times = times[~fin, new_n-stay_n:new_n]
         else:
@@ -211,9 +211,9 @@ def check_minimum_n(times, thresholds=[0.01, 0.01, 0.01, 0.01, 0.01], outliers_m
         total_suf = numpy.where(suf_flag & ~fin, total_suf, 0) # if not suf, total_suf set to 0, else keep
 
         if using_stat:
-            print(f" - No.{try_i+1}/{run_number - init_num}. Finish: {numpy.sum(fin)}/{len(fin)}; This Finish: {total_suf_num}; q1s: {q1s_suf_num}; q3s: {q3s_suf_num}; meds: {meds_suf_num}; avgs: {avgs_suf_num}; vars: {vars_suf_num}.")
+            print(f" - No.{try_i+1}/{(run_number - init_num)//step}. Finish: {numpy.sum(fin)}/{len(fin)}; This Finish: {total_suf_num}; q1s: {q1s_suf_num}; q3s: {q3s_suf_num}; meds: {meds_suf_num}; avgs: {avgs_suf_num}; vars: {vars_suf_num}.")
         else:
-            print(f" - No.{try_i+1}/{run_number - init_num}. Finish: {numpy.sum(fin)}/{len(fin)}; This Finish: {total_suf_num}; jsdis: {js_suf_num}.")
+            print(f" - No.{try_i+1}/{(run_number - init_num)//step}. Finish: {numpy.sum(fin)}/{len(fin)}; This Finish: {total_suf_num}; jsdis: {js_suf_num}.")
             jsdiss = list()
         fin_nums.append(numpy.sum(fin))
         #if q1s_suf and q3s_suf and meds_suf and avgs_suf and vars_suf:
@@ -288,6 +288,7 @@ if __name__ == "__main__":
 
     parser.add_argument('-t', '--thresholds', type=float, nargs='+', default=[0.01, 0.01, 0.01, 0.01, 0.05])
     parser.add_argument('-l', '--tolerance', type=int, default=4)
+    parser.add_argument('-p', '--step', type=int, default=5)
     parser.add_argument('-i', '--init-num', type=int, default=30)
     parser.add_argument('-u', '--check-npz-path', type=str, default=None)
 
@@ -337,7 +338,7 @@ if __name__ == "__main__":
         i80 = run_number,
     )
     if arguments.check_min_n:
-        minimum_n, fin_nums = check_minimum_n(combined_times, thresholds=thresholds, tolerance=tolerance, detect_type=detect_type, init_num=init_num, using_stat=arguments.using_stat, fit_type=arguments.fit_type)
+        minimum_n, fin_nums = check_minimum_n(combined_times, thresholds=thresholds, tolerance=tolerance, detect_type=detect_type, init_num=init_num, using_stat=arguments.using_stat, fit_type=arguments.fit_type, step=arguments.step, outliers_mode=arguments.rm_outs_type)
         i95 = numpy.sum((fin_nums < numpy.floor(0.95 * combined_times.shape[0]))) + init_num
         i90 = numpy.sum((fin_nums < numpy.floor(0.90 * combined_times.shape[0]))) + init_num
         i85 = numpy.sum((fin_nums < numpy.floor(0.85 * combined_times.shape[0]))) + init_num
