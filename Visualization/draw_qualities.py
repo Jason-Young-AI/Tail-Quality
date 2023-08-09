@@ -6,6 +6,7 @@ import pathlib
 import argparse
 import multiprocessing
 
+import matplotlib as mpl
 from matplotlib import pyplot
 
 from constant import quality_choices, dataset_choices, combine_choices, rm_outs_choices, quality_map
@@ -116,16 +117,28 @@ def draw_qualities(save_dir, main_results, combined_times, quality_type, dataset
     if quality_type == 'acc':
         origin_quality = origin_quality[1]
 
+    mpl.rcParams['font.size'] = 14
+    mpl.rcParams['axes.labelsize'] = 16
+    mpl.rcParams['xtick.labelsize'] = 14
+    mpl.rcParams['ytick.labelsize'] = 14
+    mpl.rcParams['legend.fontsize'] = 14
+
     fig, axes = pyplot.subplots(1, 1, figsize=(10, 10))
     ax = axes
 
-    ogn_color = 'xkcd:crimson'
-    max_color = 'xkcd:darkblue'
-    min_color = 'xkcd:chartreuse'
-    avg_color = 'xkcd:indigo'
+    cmap = pyplot.get_cmap('tab20')
+    #colors = [cmap(i) for i in numpy.linspace(0, 1, 3)]
 
-    ax.scatter(thresholds[-1], origin_quality, label='No Time Limit', color=ogn_color, marker='*', s=10, zorder=3)
-    ax.annotate(f'q = {origin_quality*100:.3f}', xy=(thresholds[-1], origin_quality),
+    ogn_color = cmap(6)
+    max_color = cmap(10)
+    maxs_color = cmap(12)
+    min_color = cmap(14)
+    mins_color = cmap(16)
+    avg_color = cmap(0)
+    vln_color = cmap(15)
+
+    ax.scatter(thresholds[-1]*1000, origin_quality, label='No Time Limit', color=ogn_color, marker='*', s=15, zorder=3)
+    ax.annotate(f'{origin_quality*100:.3f}', xy=(thresholds[-1]*1000, origin_quality),
             xytext=(-4, numpy.sign(origin_quality)*3), textcoords="offset points",
             horizontalalignment="right",
             verticalalignment="bottom" if origin_quality > 0 else "top")
@@ -133,9 +146,23 @@ def draw_qualities(save_dir, main_results, combined_times, quality_type, dataset
     # Special Thresholds
     special_mins = numpy.min(qualities[-len(special_thresholds):, :], axis=-1)
     special_maxs = numpy.max(qualities[-len(special_thresholds):, :], axis=-1)
-    ax.vlines(special_thresholds, special_mins, special_maxs, ls=':', color='c', label=r'All $\alpha$s at $\theta$')
-    ax.scatter(special_thresholds, special_maxs, label=r'Max quality at threshold', marker='v', edgecolors='g', facecolors='1', s=10, zorder=4)
-    ax.scatter(special_thresholds, special_mins, label=r'Min quality at threshold', marker='^', edgecolors='m', facecolors='1', s=10, zorder=4)
+    ax.vlines(special_thresholds*1000, special_mins, special_maxs, ls=':', color=vln_color, zorder=4)#, label=r'All $\alpha$s at $\theta$')
+    ax.scatter(special_thresholds*1000, special_maxs, marker='v', edgecolors=maxs_color, facecolors='1', s=15, zorder=4)
+    ax.scatter(special_thresholds*1000, special_mins, marker='^', edgecolors=mins_color, facecolors='1', s=15, zorder=4)
+    for x, ymin, ymax in zip(special_thresholds*1000, special_mins, special_maxs):
+        ymid = (ymin+ymax) / 2
+        # ax.annotate(f'ltc = {x:.5f}', xy=(x, ymin),
+        #         xytext=(+0, -5 * np.sign(ymid)*3), textcoords="offset points",
+        #         horizontalalignment="center",
+        #         verticalalignment="top" if ymid > 0 else "bottom")
+        ax.annotate(f'{ymin*100:.2f} ({x:.2f}ms)', xy=(x, ymin),
+                xytext=(+8, 0), textcoords="offset points",
+                horizontalalignment="left",
+                verticalalignment="top" if ymin > 0 else "bottom")
+        ax.annotate(fr'{ymax*100:.2f}', xy=(x, ymax),
+                xytext=(-4, numpy.sign(ymax)*3), textcoords="offset points",
+                horizontalalignment="right",
+                verticalalignment="bottom" if ymax > 0 else "top")
 
     # Thresholds
     origin_indices = list()
@@ -143,17 +170,19 @@ def draw_qualities(save_dir, main_results, combined_times, quality_type, dataset
     for origin_index, threshold in sorted(enumerate(all_thresholds), key=lambda x: x[1]):
         origin_indices.append(origin_index)
         sorted_all_thresholds.append(threshold)
+
+    sorted_all_thresholds = numpy.array(sorted_all_thresholds)
     avgs = numpy.average(qualities, axis=-1)[origin_indices]
     mins = numpy.min(qualities, axis=-1)[origin_indices]
     maxs = numpy.max(qualities, axis=-1)[origin_indices]
     stds = numpy.std(qualities, axis=-1)[origin_indices]
-    ax.plot(sorted_all_thresholds, maxs, label=f'Maximum Quality({quality_map[quality_type]})', color=max_color, linewidth=1.0)
-    ax.plot(sorted_all_thresholds, mins, label=f'Minimum Quality({quality_map[quality_type]})', color=min_color, linewidth=1.0)
-    ax.plot(sorted_all_thresholds, avgs, label=f'Average Quality({quality_map[quality_type]})', color=avg_color, linewidth=1.0)
-    ax.fill_between(sorted_all_thresholds, numpy.minimum(avgs + stds, maxs), numpy.maximum(avgs - stds, mins), label='Standard Deviation', color=avg_color, alpha=0.2)
+    ax.plot(sorted_all_thresholds*1000, maxs, label=f'Maximum {quality_map[quality_type]}', color=max_color, linewidth=2.0)
+    ax.plot(sorted_all_thresholds*1000, mins, label=f'Minimum {quality_map[quality_type]}', color=min_color, linewidth=2.0)
+    ax.plot(sorted_all_thresholds*1000, avgs, label=f'Average {quality_map[quality_type]}', color=avg_color, linewidth=2.0)
+    ax.fill_between(sorted_all_thresholds*1000, numpy.minimum(avgs + stds, maxs), numpy.maximum(avgs - stds, mins), color=avg_color, alpha=0.2)
 
-    ax.set_xlabel('Inference Time Thresholds (sec.)', fontsize=8)
-    ax.set_ylabel(f'Quality ({quality_map[quality_type]})', fontsize=8)
+    ax.set_xlabel('Inference Time Thresholds (Milliseconds)')
+    ax.set_ylabel(f'Inference Quality ({quality_map[quality_type]})')
     ax.legend()
 
     figpath = save_dir.joinpath(f'qualities.pdf')
@@ -212,7 +241,7 @@ def draw(extracted_data, quality_type, dataset_type, combine_type, rm_outs_type,
     #preprocess_times = extracted_data['other_results']['preprocess_times']
     #postprocess_times = extracted_data['other_results']['postprocess_times']
 
-    combined_times = combine_times(extracted_data['other_results'], combine_type) # numpy.array()[instance_number * run_number]
+    combined_times = combine_times(extracted_data['other_results'], combine_type)[:, :20] # numpy.array()[instance_number * run_number]
 
     print(f'[Begin] Drawing ...')
 
