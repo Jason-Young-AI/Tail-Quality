@@ -77,7 +77,7 @@ def combine_times(times, combine_type):
     return combined_times
 
 
-def calculate_acc(results, dataset_type='ImageNet', assets_path=pathlib.Path('assets'), threshold=None, times=None):
+def calculate_acc(results, dataset_type='ImageNet', assets_path=pathlib.Path('assets'), threshold=None, times=None, no_print=False):
     assert dataset_type in dataset_choices, f"Wrong Type of Dataset: {dataset_type}"
 
     if dataset_type == 'ImageNet':
@@ -217,7 +217,7 @@ def calculate_map(results, dataset_type='COCO', assets_path=pathlib.Path('assets
         return cocoEval.stats
 
 
-def calculate_wf1(results, dataset_type='MELD', assets_path=pathlib.Path('assets'), threshold=None, times=None):
+def calculate_wf1(results, dataset_type='MELD', assets_path=pathlib.Path('assets'), threshold=None, times=None, no_print=False):
     pass
 
 

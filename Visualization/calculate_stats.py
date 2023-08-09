@@ -1,3 +1,4 @@
+import time
 import scipy
 import numpy
 import pathlib
@@ -8,9 +9,9 @@ from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import GridSearchCV
 from scipy.spatial.distance import jensenshannon
 
-from calculate_quality import combine_times, calculate_stat
+from calculate_quality import combine_times, calculate_stat, calculate_acc, calculate_map
 from extract_data import extract_data, get_main_record
-from constant import dataset_choices, combine_choices, rm_outs_choices, detect_choices, level_choices, fit_choices
+from constant import dataset_choices, combine_choices, rm_outs_choices, detect_choices, level_choices, fit_choices, quality_choices
 
 
 def remove_outliers(new_times, new_stats, outliers_mode):
@@ -67,6 +68,7 @@ def check_all_jsdis(check_model, models, ins_times):
     x = numpy.linspace(ins_times.min(), ins_times.max(), 1000).reshape(-1, 1)
     for model in models:
         js_dis.append(jensenshannon(numpy.exp(check_model.score_samples(x))+epsilon, numpy.exp(model.score_samples(x))+epsilon))
+        #js_dis.append(pow(jensenshannon(numpy.exp(check_model.score_samples(x))+epsilon, numpy.exp(model.score_samples(x))+epsilon), 2))
 
     if len(js_dis) == 0:
         js_dis = [1,]
@@ -87,8 +89,11 @@ def check_minimum_n(times, thresholds=[0.01, 0.01, 0.01, 0.01, 0.01], outliers_m
     else:
         all_models = [list() for _ in range(instance_number)]
         jsdiss = list()
+        total_jsdis = 0
+        total_try = 1
     fin_nums = list()
     for try_i, new_n in enumerate(range(stay_n+step, run_number+step, step)):
+        total_try = try_i + 1
         if detect_type == 'slide':
             new_times = times[~fin, new_n-stay_n:new_n]
         else:
@@ -186,6 +191,19 @@ def check_minimum_n(times, thresholds=[0.01, 0.01, 0.01, 0.01, 0.01], outliers_m
             js_suf_flag = numpy.sum(jsdiss > thresholds[0], axis=-1) == 0
             js_suf_num = numpy.sum(js_suf_flag)
             suf_flag = js_suf_flag
+            if new_n < run_number:
+                if len(jsdiss[js_suf_flag]):
+                    avg_cj = numpy.average(jsdiss[js_suf_flag])
+                    total_jsdis += avg_cj
+                else:
+                    avg_cj = 0
+            else:
+                if len(jsdiss):
+                    avg_cj = numpy.average(jsdiss)
+                    total_jsdis += avg_cj
+                else:
+                    avg_cj = 0
+                #print(f"Un-Fin: {}")
 
             temp_i = 0
             for f_id, f in enumerate(fin):
@@ -213,7 +231,7 @@ def check_minimum_n(times, thresholds=[0.01, 0.01, 0.01, 0.01, 0.01], outliers_m
         if using_stat:
             print(f" - No.{try_i+1}/{(run_number - init_num)//step}. Finish: {numpy.sum(fin)}/{len(fin)}; This Finish: {total_suf_num}; q1s: {q1s_suf_num}; q3s: {q3s_suf_num}; meds: {meds_suf_num}; avgs: {avgs_suf_num}; vars: {vars_suf_num}.")
         else:
-            print(f" - No.{try_i+1}/{(run_number - init_num)//step}. Finish: {numpy.sum(fin)}/{len(fin)}; This Finish: {total_suf_num}; jsdis: {js_suf_num}.")
+            print(f" - No.{try_i+1}/{(run_number - init_num)//step}. Finish: {numpy.sum(fin)}/{len(fin)}; This Finish: {total_suf_num}; jsdis: {js_suf_num}; avgcj: {avg_cj:.3f}.")
             jsdiss = list()
         fin_nums.append(numpy.sum(fin))
         #if q1s_suf and q3s_suf and meds_suf and avgs_suf and vars_suf:
@@ -232,7 +250,11 @@ def check_minimum_n(times, thresholds=[0.01, 0.01, 0.01, 0.01, 0.01], outliers_m
         #    minimum_n = new_n
         #    break
 
-    return minimum_n, numpy.array(fin_nums)
+    avg_train_jsd = 1
+    if not using_stat:
+        avg_train_jsd = total_jsdis/total_try
+        print(f"Avg Train JSD: {avg_train_jsd:.3f}")
+    return minimum_n, numpy.array(fin_nums), avg_train_jsd
 
 
 def check_common_dist(times, minimum_n, outliers_mode='quantile'):
@@ -278,6 +300,71 @@ def check_common_dist(times, minimum_n, outliers_mode='quantile'):
     return np_fit
 
 
+def check_fit(train_times, test_times, min_ns):
+    tic = time.perf_counter()
+    total_js_dis = 0
+    for index, (train_time, test_time, min_n) in enumerate(zip(train_times, test_times, min_ns)):
+        ins_times = numpy.concatenate([train_time[:min_n], test_time])
+        train_ins_times = train_time[:min_n].reshape(-1, 1)
+        test_ins_times = test_time.reshape(-1, 1)
+        #print(f"No.{index+1} Fitting.")
+        train_model = fit(train_ins_times, 'kde')
+        test_model = fit(test_ins_times, 'kde')
+        epsilon = 1e-8
+        x = numpy.linspace(ins_times.min(), ins_times.max(), 1000).reshape(-1, 1)
+        js_dis = jensenshannon(numpy.exp(train_model.score_samples(x))+epsilon, numpy.exp(test_model.score_samples(x))+epsilon)
+        #js_dis = pow(jensenshannon(numpy.exp(train_model.score_samples(x))+epsilon, numpy.exp(test_model.score_samples(x))+epsilon), 2)
+        #print(f"No.{index} JSD: {js_dis:.3f}")
+        total_js_dis += js_dis
+
+    toc = time.perf_counter()
+    print(f"Total time consume: {toc-tic:.2f}s")
+    avg_jsd = total_js_dis/len(min_ns)
+    print(f"Avg JSD: {avg_jsd:.3f}")
+    return avg_jsd
+
+
+def check_quality(quality_type, dataset_type, train_times, test_times, results, perc):
+    if quality_type == 'acc' and dataset_type == 'ImageNet':
+        index = 1
+
+    if quality_type == 'acc' and dataset_type == 'MMLU':
+        index = 1
+
+    if quality_type == 'map' and dataset_type == 'COCO':
+        index = 0
+
+    quality_calculate = globals()['calculate_' + quality_type]
+    train_threshold = numpy.percentile(train_times, perc)
+    test_threshold = numpy.percentile(test_times, perc)
+    train_total_quality = list()
+    test_total_quality = list()
+    instance_number, run_number = train_times.shape
+    for i  in range(run_number):
+        train_quality = quality_calculate(results, dataset_type, assets_path=pathlib.Path('assets'), threshold=train_threshold, times=train_times[:, i], no_print=True)
+        train_total_quality.append(train_quality[index])
+
+    avg_train = numpy.average(train_total_quality)
+    min_train = numpy.min(train_total_quality)
+    var_train = numpy.var(train_total_quality)
+
+    instance_number, run_number = test_times.shape
+    for i  in range(run_number):
+        test_quality = quality_calculate(results, dataset_type, assets_path=pathlib.Path('assets'), threshold=test_threshold, times=test_times[:, i], no_print=True)
+        test_total_quality.append(test_quality[index])
+    avg_test = numpy.average(test_total_quality)
+    min_test = numpy.min(test_total_quality)
+    var_test = numpy.var(test_total_quality)
+
+    print(f"Avg Q:{quality_type}: Train avg:{avg_train:.6f}, min:{min_train:.6f}, var{var_train:.6f}")
+    print(f"                      Test  avg:{avg_test:.6f}, min:{min_test:.6f}, var{var_test:.6f}")
+    print(f"                      Dis   avg:{abs(avg_train-avg_test):.6f}, min:{abs(min_train-min_test):.6f}, var{abs(var_train-var_test):.6f}")
+    train_results = numpy.array([avg_train, min_train, var_train])
+    test_results = numpy.array([avg_test, min_test, var_test])
+    results = numpy.abs(train_results - test_results)
+    return results
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Calculate Quality')
     parser.add_argument('-d', '--data-dir', type=str, required=True)
@@ -301,12 +388,14 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--dataset-type', type=str, default='ImageNet', choices=dataset_choices)
     parser.add_argument('-c', '--combine-type', type=str, default='i', choices=combine_choices)
     parser.add_argument('-r', '--rm-outs-type', type=str, default='none', choices=rm_outs_choices)
+    parser.add_argument('-q', '--quality-type', type=str, default='acc', choices=quality_choices)
     arguments = parser.parse_args()
 
     detect_type = arguments.detect_type
     dataset_type = arguments.dataset_type
     combine_type = arguments.combine_type
     rm_outs_type = arguments.rm_outs_type
+    quality_type = arguments.quality_type
 
     init_num = arguments.init_num
     assert init_num > 0
@@ -338,7 +427,7 @@ if __name__ == "__main__":
         i80 = run_number,
     )
     if arguments.check_min_n:
-        minimum_n, fin_nums = check_minimum_n(combined_times, thresholds=thresholds, tolerance=tolerance, detect_type=detect_type, init_num=init_num, using_stat=arguments.using_stat, fit_type=arguments.fit_type, step=arguments.step, outliers_mode=arguments.rm_outs_type)
+        minimum_n, fin_nums, train_jsd = check_minimum_n(combined_times[:, :-30], thresholds=thresholds, tolerance=tolerance, detect_type=detect_type, init_num=init_num, using_stat=arguments.using_stat, fit_type=arguments.fit_type, step=arguments.step, outliers_mode=arguments.rm_outs_type)
         i95 = numpy.sum((fin_nums < numpy.floor(0.95 * combined_times.shape[0]))) + init_num
         i90 = numpy.sum((fin_nums < numpy.floor(0.90 * combined_times.shape[0]))) + init_num
         i85 = numpy.sum((fin_nums < numpy.floor(0.85 * combined_times.shape[0]))) + init_num
@@ -355,12 +444,37 @@ if __name__ == "__main__":
     else:
         min_ns = numpy.array([dataset_minimum_n[arguments.n_level] for _ in range(combined_times.shape[0])])
 
-    np_fit = check_common_dist(combined_times, min_ns, outliers_mode='none')
+    fast = False
+    if fast and arguments.check_npz_path is not None:
+        check_data = numpy.load(arguments.check_npz_path)
+        min_ns = check_data['min_ns']
+        i95 = check_data['i95']
+
+    test_jsd = check_fit(combined_times[:, :-30], combined_times[:, -30:], min_ns)
+    def expand_record(records, elen, batch_size):
+        erec = numpy.repeat(records, batch_size, axis=0)
+        return erec[:elen]
+    origin_times = expand_record(combined_times, len(extracted_data['main_results']), arguments.batch_size)
+
+    all_q = True
+    q_diss = list()
+    if all_q:
+        q_diss.append(check_quality(quality_type, dataset_type, origin_times[:, :-30][:, :i95], origin_times[:, -30:], extracted_data['main_results'], 99))
+        q_diss.append(check_quality(quality_type, dataset_type, origin_times[:, :-30][:, :i95], origin_times[:, -30:], extracted_data['main_results'], 95))
+        q_diss.append(check_quality(quality_type, dataset_type, origin_times[:, :-30][:, :i95], origin_times[:, -30:], extracted_data['main_results'], 90))
+        q_diss.append(check_quality(quality_type, dataset_type, origin_times[:, :-30][:, :i95], origin_times[:, -30:], extracted_data['main_results'], 60))
+        q_diss = numpy.array(q_diss)
+        if quality_type == 'acc':
+            print(numpy.average(q_diss, axis=0)*100)
+        #np_fit = check_common_dist(combined_times, min_ns, outliers_mode='none')
 
     check_data = dict(
         min_ns = minimum_n,
-        np_fit = np_fit,
+        #np_fit = np_fit,
         **dataset_minimum_n,
+        train_jsd = train_jsd,
+        test_jsd = test_jsd,
+        q_diss = q_diss
     )
 
     if arguments.check_npz_path is not None:
