@@ -428,10 +428,15 @@ if __name__ == "__main__":
     )
     if arguments.check_min_n:
         minimum_n, fin_nums, train_jsd = check_minimum_n(combined_times[:, :-30], thresholds=thresholds, tolerance=tolerance, detect_type=detect_type, init_num=init_num, using_stat=arguments.using_stat, fit_type=arguments.fit_type, step=arguments.step, outliers_mode=arguments.rm_outs_type)
-        i95 = numpy.sum((fin_nums < numpy.floor(0.95 * combined_times.shape[0]))) + init_num
-        i90 = numpy.sum((fin_nums < numpy.floor(0.90 * combined_times.shape[0]))) + init_num
-        i85 = numpy.sum((fin_nums < numpy.floor(0.85 * combined_times.shape[0]))) + init_num
-        i80 = numpy.sum((fin_nums < numpy.floor(0.80 * combined_times.shape[0]))) + init_num
+        minimum_n = numpy.minimum(minimum_n+init_num, run_number -30)
+        i95 = int(numpy.percentile(minimum_n, 95))
+        i90 = int(numpy.percentile(minimum_n, 90))
+        i85 = int(numpy.percentile(minimum_n, 85))
+        i80 = int(numpy.percentile(minimum_n, 80))
+        # i95 = numpy.sum((fin_nums < numpy.floor(0.95 * combined_times.shape[0]))) + init_num
+        # i90 = numpy.sum((fin_nums < numpy.floor(0.90 * combined_times.shape[0]))) + init_num
+        # i85 = numpy.sum((fin_nums < numpy.floor(0.85 * combined_times.shape[0]))) + init_num
+        # i80 = numpy.sum((fin_nums < numpy.floor(0.80 * combined_times.shape[0]))) + init_num
         dataset_minimum_n['i95'] = i95
         dataset_minimum_n['i90'] = i90
         dataset_minimum_n['i85'] = i85
@@ -466,6 +471,8 @@ if __name__ == "__main__":
         q_diss = numpy.array(q_diss)
         if quality_type == 'acc':
             print(numpy.average(q_diss, axis=0)*100)
+        else:
+            print(numpy.average(q_diss, axis=0))
         #np_fit = check_common_dist(combined_times, min_ns, outliers_mode='none')
 
     check_data = dict(
