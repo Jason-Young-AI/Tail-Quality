@@ -64,7 +64,6 @@ if __name__ == "__main__":
         pathlib.Path("../Results/Raw/P100_DETR_TensorFlow_val_bsz1/"),
     ]
     labels = [
-        "Server A",
         "Server B",
         "Server C",
     ]
@@ -103,7 +102,8 @@ if __name__ == "__main__":
     s_local_times = [s_times[id][0] for id in ids]
     s_local_ids = [s_times[id][1] for id in ids]
 
-    out_times = [d_local_times[0], ]
+    #out_times = [d_local_times[0], ]
+    out_times = []
 
     extracted_data = extract_data(data_dirs[1], data_filename, dataset_type)
     combined_times = combine_times(extracted_data['other_results'], combine_type)
@@ -131,9 +131,11 @@ if __name__ == "__main__":
 
     cmap = plt.get_cmap('viridis')
     colors = [cmap(i) for i in numpy.linspace(0, 1, 7)]
+    #cmap = plt.get_cmap('tab10')
+    #colors = [cmap(i) for i in range(7)]
 
-    fig, axes = plt.subplots(1, 2, figsize=(20, 10))
-    ax = axes[0]
+    fig, axes = plt.subplots(1, 1, figsize=(10, 10))
+    ax = axes
     tax = ax.twinx()
 
     xs = numpy.linspace(numpy.min(local_times), numpy.max(local_times), num=1000)
@@ -143,14 +145,7 @@ if __name__ == "__main__":
         ys = get_model_pdf(xs.reshape(-1, 1), best_model, fit_type)
 
         ax.hist(ins_times, bins=30, alpha=0.5, color=colors[order])
-        tax.plot(xs, ys, label=f'# {id} ({batch_image_sizes[id][0]} x {batch_image_sizes[id][1]}) (Server A)', color=colors[order])
-    
-    ax.set_xlabel('Inference Time (Seconds)')
-    ax.set_ylabel('Frequency')
-    tax.legend()
-
-    ax = axes[1]
-    tax = ax.twinx()
+        tax.plot(xs, ys, label=f'#{id} ({batch_image_sizes[id][0]} x {batch_image_sizes[id][1]}) (Server A)', color=colors[order])
 
     xs = numpy.linspace(numpy.min(out_times), numpy.max(out_times), num=1000)
     for order, ins_times in enumerate(out_times):
@@ -160,10 +155,11 @@ if __name__ == "__main__":
         area = scipy.integrate.simps(ys, xs)
         print(area)
 
-        ax.hist(ins_times, bins=30, alpha=0.5, color=colors[order+4])
-        tax.plot(xs, ys, label=f'#{local_ids[0]} ({labels[order]})', color=colors[order+4])
+        ax.hist(ins_times, bins=30, alpha=0.5, color=colors[order+5])
+        tax.plot(xs, ys, label=f'#{local_ids[0]} ({batch_image_sizes[main_id][0]} x {batch_image_sizes[main_id][1]}) ({labels[order]})', color=colors[order+5])
 
     ax.set_xlabel('Inference Time (Seconds)')
+    ax.set_ylabel('Frequency')
     tax.set_ylabel('Probability Density')
     tax.legend()
     plt.tight_layout()
