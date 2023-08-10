@@ -134,7 +134,7 @@ if __name__ == "__main__":
     #cmap = plt.get_cmap('tab10')
     #colors = [cmap(i) for i in range(7)]
 
-    fig, axes = plt.subplots(1, 1, figsize=(10, 10))
+    fig, axes = plt.subplots(1, 1, figsize=(10.5, 10))
     ax = axes
     tax = ax.twinx()
 
