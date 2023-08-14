@@ -16,7 +16,7 @@ python3 -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'
 
 
 # Install NVCC
-conda install -c nvidia cuda-nvcc=11.3.58
+conda install -c nvidia cuda-nvcc=11.3.58 -y
 # Configure the XLA cuda directory
 mkdir -p $CONDA_PREFIX/etc/conda/activate.d
 printf 'export XLA_FLAGS=--xla_gpu_cuda_data_dir=$CONDA_PREFIX/lib/\n' >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
