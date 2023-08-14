@@ -74,7 +74,7 @@ def draw_qualities(save_dir, main_results, combined_times, quality_type, dataset
     min_lower_thr = numpy.min(lower_threshold)
     max_upper_thr = numpy.max(upper_threshold)
 
-    percentile = numpy.array([0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]) * 100
+    percentile = numpy.array([0.90, 0.95, 0.99]) * 100
     special_thresholds = numpy.percentile(combined_times, percentile, method='lower')
 
     threshold_step = (max_upper_thr - min_lower_thr) / interplt_num
@@ -183,9 +183,10 @@ def draw_qualities(save_dir, main_results, combined_times, quality_type, dataset
 
     ax.set_xlabel('Inference Time Thresholds (Milliseconds)')
     ax.set_ylabel(f'Inference Quality ({quality_map[quality_type]})')
-    ax.legend()
+    ax.legend(loc='lower right')
+    pyplot.tight_layout()
 
-    figpath = save_dir.joinpath(f'qualities.pdf')
+    figpath = save_dir.joinpath(f'{rm_outs_type}.pdf')
     fig.savefig(figpath)
     print(f' - Fig Exported: {figpath}')
 
