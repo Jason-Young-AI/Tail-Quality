@@ -227,11 +227,11 @@ if __name__ == "__main__":
     if args.run_mode == 'val':
         val_path = dataset_root.joinpath("val")
         assert val_path.is_dir(), f"MMLU val path {val_path} does not exist"
-        tasks, data_paths = load_dataset(dev_path, val_path)
+        tasks, data_paths = load_dataset(dev_path, val_path, mode=args.run_mode)
     if args.run_mode == 'test':
         test_path = dataset_root.joinpath("test")
         assert test_path.is_dir(), f"MMLU test path {test_path} does not exist"
-        tasks, data_paths = load_dataset(dev_path, test_path)
+        tasks, data_paths = load_dataset(dev_path, test_path, mode=args.run_mode)
 
     indices = set()
     for i in args.write_main_indices:
