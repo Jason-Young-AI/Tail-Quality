@@ -6,6 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
+# Exclude directory
+Experiments/LightGCN/Pytorch/code/checkpoints
+Experiments/LightGCN/PyTorch/code/runs
+
 # Distribution / packaging
 .Python
 build/
