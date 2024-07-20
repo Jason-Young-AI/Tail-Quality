@@ -318,8 +318,8 @@ if __name__ == "__main__":
     with open(result_path, 'w') as f:
         json.dump(result_list, f, indent=2)
     with open(rjsds_path, 'w') as f:
-        pass
+        json.dump(rjsds, f, indent=2)
     with open(fit_distribution_path, 'w') as f:
-        pass
+        pickle.dump(fit_distribution_models, f) 
     
 
