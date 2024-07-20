@@ -239,7 +239,9 @@ if __name__ == "__main__":
     fake_run = args.fake_run
 
     result_path = results_basepath.joinpath('Light_GCN_Pytorch.json')
-    rjsds_path = results_basepath.joinpath('Light_GCN_Pytorch_rjsds.pickle')
+    rjsds_path = results_basepath.joinpath('Light_GCN_Pytorch_rjsds.json')
+    fit_distribution_path = results_basepath.joinpath('Light_GCN_Pytorch_distributions.pickle')
+
     all_times = list()
     total_batches = 0
     if result_path.exists():
@@ -316,6 +318,8 @@ if __name__ == "__main__":
     with open(result_path, 'w') as f:
         json.dump(result_list, f, indent=2)
     with open(rjsds_path, 'w') as f:
+        pass
+    with open(fit_distribution_path, 'w') as f:
         pass
     
 
