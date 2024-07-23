@@ -3,6 +3,7 @@ import json
 import numpy
 import pickle
 import pathlib
+import logging
 import argparse
 import matplotlib.pyplot as plt
 
@@ -11,6 +12,7 @@ from sklearn.mixture import GaussianMixture
 from scipy.spatial.distance import jensenshannon
 from typing import List
 
+# for LightGCN
 import world
 import utils
 import time
@@ -19,6 +21,21 @@ import numpy as np
 import model
 import register
 from register import dataset
+
+logger = logging.getLogger('my_logger')
+logger.setLevel(logging.DEBUG)
+
+
+def get_model_parameters_number(model: torch.nn.Module) -> int:
+    parameters_number = dict()
+    for name, parameters in model.named_parameters():
+        root_name = name.split('.')[0]
+        if root_name in parameters_number:
+            parameters_number[root_name] += parameters.numel()
+        else:
+            parameters_number[root_name] = parameters.numel()
+
+    return parameters_number
 
 
 def kde_aic(bandwidth, ins_times):
@@ -78,7 +95,7 @@ def check_fit_dynamic(fit_distribution_models, fit_distribution_model, all_times
     total_js_dis = 0
     all_times = numpy.array(all_times)
     current_distribution = fit_distribution_model 
-    compared_distributions = fit_distribution_models[-window_size:]
+    compared_distributions = fit_distribution_models
     for compared_distribution in compared_distributions:
         epsilon = 1e-8
         x = numpy.linspace(all_times.min(), all_times.max(), 1000).reshape(-1, 1) 
@@ -111,14 +128,6 @@ def Inference(params):
     dataset = params['dataset']
     Recmodel = params['Recmodel']
     fake_run = params['fake_run']
-    warm_run = params['warm_run']
-    already_run_number = params['already_run_number']
-    already_batch_number = params['already_batch_number']
-    warm_batch_number = params['warm_batch_number']
-    fit_distribution_models = params['fit_distribution_models']
-    rjsds = params['rjsds']
-    rJSD_threshold = params['rJSD_threshold']
-    sucess_flag = params['sucess_flag']
     u_batch_size = world.config['test_u_batch_size']
     dataset: utils.BasicDataset
     testDict: dict = dataset.testDict
@@ -137,7 +146,9 @@ def Inference(params):
     groundTrue_list = []
         
     total_batch = len(users) // u_batch_size + 1
-    tmp_dic = dict()
+    tmp_inference_dic = dict()
+    tmp_total_dic = dict()
+    a = time.perf_counter()
     for batch_id, batch_users in enumerate(utils.minibatch(users, batch_size=u_batch_size), start=1):
         allPos = dataset.getUserPosItems(batch_users)
         groundTrue = [testDict[u] for u in batch_users]
@@ -145,26 +156,13 @@ def Inference(params):
         batch_users_gpu = batch_users_gpu.to(world.device)
 
         inference_start = time.perf_counter()
+        preprocess_time = inference_start - a 
         rating = Recmodel.getUsersRating(batch_users_gpu)
         inference_end = time.perf_counter()
         inference_time = inference_end - inference_start
-        tmp_dic[batch_id] = float(inference_time)
-        all_times.append(inference_time)
-
-        already_batch_number += 1
-        if already_run_number < warm_run: 
-            warm_batch_number += 1 
-        if already_run_number is not 0 and ((already_batch_number - warm_batch_number) % fit_batches) == 0:
-            fit_distribution_model = fit(all_times)
-            print(' len(fit_distribution_models) % window_size : ', len(fit_distribution_models) % window_size) 
-            if len(fit_distribution_models) % window_size == 0 and len(fit_distribution_models) is not 0:
-                rjsd = check_fit_dynamic(fit_distribution_models, fit_distribution_model, all_times, window_size)
-                rjsds.append(rjsd)
-                print('During this run, rjsd is', rjsd)
-                sucess_flag = True if rjsd <= rJSD_threshold else False
-
-            fit_distribution_models.append(fit_distribution_model)
-            
+        tmp_inference_dic[batch_id] = float(inference_time)
+        postprocess_start = time.perf_counter()
+        
         exclude_index = []
         exclude_items = []
         for range_i, items in enumerate(allPos):
@@ -178,17 +176,22 @@ def Inference(params):
         users_list.append(batch_users)
         rating_list.append(rating_K.cpu())
         groundTrue_list.append(groundTrue)
+        postprocess_end = time.perf_counter()
+        postprocess_time = postprocess_end - postprocess_start
+        total_time = preprocess_time + inference_time + postprocess_time
+        tmp_total_dic[batch_id] = float(total_time)
+        # print('total_time, inference_time: ', total_time, inference_time)
+        a = time.perf_counter()
+
     assert total_batch == len(users_list)
-    
+
     X = zip(rating_list, groundTrue_list)
 
     pre_results = []
     for batch_id, x in enumerate(X, start=1):
-        post_process_start = time.perf_counter()
         pre_results.append(test_one_batch(x))
-        post_process_end = time.perf_counter()
-
-    if already_run_number == 0:
+        
+    if fake_run:
         origin_quality = dict()   
         for batch_id, result in enumerate(pre_results, start=1):
             origin_quality[batch_id] = dict(
@@ -196,30 +199,30 @@ def Inference(params):
                 precision = float(result['precision'].item()),
                 ndcg = float(result['ndcg'].item())
             )
-        
         with open(results_basepath.joinpath('Light_GCN_Pytorch_origin_quality.json'), 'w') as f:
             json.dump(origin_quality, f, indent=2)
-    already_run_number += 1
-    if fake_run:
-        return tmp_dic, params['already_run_number'], params['already_batch_number'], params['warm_batch_number'], params['fit_distribution_models'], params['rjsds'], params['sucess_flag']
-    else:
-        return tmp_dic, already_run_number, already_batch_number, warm_batch_number, fit_distribution_models, rjsds, sucess_flag
-    # for result in pre_results:
+            
+    return  tmp_inference_dic, tmp_total_dic
+    
+    # for result in pre_results: 
     #     results['recall'] += result['recall']
     #     results['precision'] += result['precision']
     #     results['ndcg'] += result['ndcg']
-        
     # results['recall'] /= float(len(users))
     # results['precision'] /= float(len(users))
     # results['ndcg'] /= float(len(users))
 
 
 def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
-    x_data = list(range(1, len(rjsds) + 1))
+    inference_data = list(range(1, len(rjsds['inference']) + 1))
+    total_data = list(range(1, len(rjsds['total']) + 1))
     fig, ax = plt.subplots()
-    ax.plot(x_data, rjsds, marker='o', linestyle='-', color='b', label='rJSD')
+    
+    ax.plot(inference_data, rjsds['inference'], marker='o', linestyle='-', color='b', label='rJSD(inference time)')
+    ax.plot(total_data, rjsds['total'], marker='o', linestyle='-', color='y', label='rJSD(total time)')
     ax.set_title('rJSD Fitting Progress')
     ax.set_xlabel('Fitting Round')
+    
     ax.set_ylabel('rJSD')
     ax.grid(True)
     plt.savefig(results_basepath.joinpath("Light_GCN_Pytorch_rjsds.jpg"), format="jpg")
@@ -228,7 +231,7 @@ def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Multiple times on the Whole Test Dataset")
-    parser.add_argument('--min-run-number', type=int, required=True)
+    parser.add_argument('--min-run', type=int, required=False)
     parser.add_argument('--batch-size', type=int, default=1) # for LightGCN, using the offical method to set batch-size
     parser.add_argument('--dataset-path', type=str, default="") # for LightGCN, using the offical method to load dataset
     parser.add_argument('--results-basepath', type=str, required=True)
@@ -236,68 +239,35 @@ if __name__ == "__main__":
     parser.add_argument('--warm-run', type=int, default=1)
     parser.add_argument('--fake-run', type=bool, default=True) # To avoid the outliers processed during the first inference
     parser.add_argument('--window-size', type=int, default=5)
-    parser.add_argument('--fit-batches', type=int, default=100)
+    parser.add_argument('--fit-run-number', type=int, default=2)
     parser.add_argument('--rJSD-threshold', type=float, default=0.05)
-    parser.add_argument('--test-run', type=int, default=0)
+    parser.add_argument('--max-run', type=int, default=0)
     args = parser.parse_args()
 
-    # dataset_path = pathlib.Path(args.dataset_path)
-    # model_path = pathlib.Path(args.model_path)
     results_basepath = pathlib.Path(args.results_basepath)
-    min_run_number = args.min_run_number 
+    min_run = args.min_run 
     warm_run = args.warm_run 
     window_size = args.window_size
-    fit_batches = args.fit_batches
+    fit_run_number = args.fit_run_number
     rJSD_threshold = args.rJSD_threshold
     fake_run = args.fake_run
-    test_run = args.test_run
+    max_run = args.max_run
 
-    result_path = results_basepath.joinpath('Light_GCN_Pytorch.json')
-    rjsds_path = results_basepath.joinpath('Light_GCN_Pytorch_rjsds.json')
+    result_path = results_basepath.joinpath('Light_GCN_Pytorch.pickle')
+    rjsds_path = results_basepath.joinpath('Light_GCN_Pytorch_rjsds.pickle')
     fit_distribution_path = results_basepath.joinpath('Light_GCN_Pytorch_distributions.pickle')
 
-    all_times = list()
     total_batches = 0
     if result_path.exists():
-        with open (result_path, 'r') as f:
-            results = json.load(f)
-            for run in results:
-                total_batches += len(run.keys())
-                for inference_time in run.values():
-                    all_times.append(inference_time)
-        with open(rjsds_path, 'r') as f:
-            rjsds = json.load(f)
-        with open(fit_distribution_path, 'rb') as f:
-            fit_distribution_models = pickle.load(f)
-    
-        already_run_number = len(results)
-        already_batch_number = total_batches 
-        warm_batch_number = len(results[0].keys())
+        with open (result_path, 'rb') as f:
+            results = pickle.load(f)
+        already_run = len(results)
+        del results
     else:
-        results = list()
-        fit_distribution_models = list()
-        rjsds = list()
-        already_run_number = 0
-        already_batch_number = 0
-        warm_batch_number = 0
-
-    """
-        results = [
-            { 
-                "batch_1" : float,
-                ...
-            }
-            {
-                "batch_2" : float,
-                ...
-            }
-            ...
-        ]
-    """
+        already_run = 0
 
     Recmodel = register.MODELS[world.model_name](world.config, dataset)
     Recmodel = Recmodel.to(world.device)
-
     weight_file = utils.getFileName()
     print(f"load and save to {weight_file}")
     if world.LOAD:
@@ -317,46 +287,104 @@ if __name__ == "__main__":
                 'dataset': dataset,
                 'Recmodel': Recmodel,
                 'fake_run': fake_run,
-                'warm_run': warm_run,
-                'already_run_number': already_run_number,
-                'already_batch_number': already_batch_number,
-                'warm_batch_number': warm_batch_number,
-                'fit_distribution_models': fit_distribution_models,
-                'rjsds': rjsds,
-                'rJSD_threshold': rJSD_threshold,
-                'sucess_flag': sucess_flag
             }
 
-            print('-------before_inference-------')
-            print(f'in loop {loop}:', loop)
-            print(f'in run {already_run_number} :')
-            print('already_batch_number: ', already_batch_number)
-            print('warm_batch_number: ', warm_batch_number)
-            print('fitted_models: ', len(fit_distribution_models))
-            print('rjsds:', len(rjsds))
-
-            result, already_run_number, already_batch_number, warm_batch_number, \
-            fit_distribution_models, rjsds, sucess_flag = Inference(params)
+            print(f'-------before inference {loop}-------')
+            print(f'already_run: {already_run}')
+            print(f'warm_run: {warm_run}')
+            
+            tmp_inference_dic, tmp_total_dic = Inference(params)
+            # print(result)
             if not fake_run:
-                results.append(result)
+                already_run += 1   
+                all_inference_times = list()
+                all_total_times = list() 
+                if result_path.exists(): 
+                    with open (result_path, 'rb') as f:
+                        results = pickle.load(f) 
+                        tmp_results = results.copy()
+                        for inference_times in tmp_results['inference']:
+                            for inference_time in inference_times.values():
+                                all_inference_times.append(inference_time)
+                        for total_times in tmp_results['total']:
+                            for total_time in total_times.values():
+                                all_total_times.append(total_time)
+                        del results
+                    tmp_results['inference'].append(tmp_inference_dic)
+                    tmp_results['total'].append(tmp_total_dic)
+                else:
+                    tmp_results = dict(
+                        inference = list(),
+                        total = list()
+                    )
+                    tmp_results['inference'].append(tmp_inference_dic)
+                    tmp_results['total'].append(tmp_total_dic)
+                with open(result_path, 'wb') as f:
+                    pickle.dump(tmp_results, f)
+
+                for key, value in tmp_inference_dic.items():
+                    all_inference_times.append(value)
+                for key, value in tmp_total_dic.items():
+                    all_total_times.append(value)
+                if (already_run - warm_run) % fit_run_number == 0:
+                    fit_inference_distribution_model = fit(all_inference_times) 
+                    fit_total_distribution_model = fit(all_total_times) 
+
+                if fit_distribution_path.exists():
+                    with open(fit_distribution_path, 'rb') as f:
+                        fit_distribution_models = pickle.load(f)
+                        tmp_fit_distribution_models = fit_distribution_models.copy()
+                        
+                    tmp_fit_distribution_models['inference'].append(fit_inference_distribution_model)
+                    tmp_fit_distribution_models['total'].append(fit_total_distribution_model)
+                else:
+                    tmp_fit_distribution_models = dict(
+                        inference = list(),
+                        total = list()
+                    )
+                    tmp_fit_distribution_models['inference'].append(fit_inference_distribution_model)
+                    tmp_fit_distribution_models['total'].append(fit_total_distribution_model)
+                with open(fit_distribution_path, 'wb') as f:
+                    pickle.dump(tmp_fit_distribution_models, f)
+
+                if len(tmp_fit_distribution_models['inference']) % window_size == 0 and len(tmp_fit_distribution_models['inference']) != 0:
+                    inference_rjsd = check_fit_dynamic(fit_distribution_models[-window_size:], fit_inference_distribution_model)
+                    total_rjsd = check_fit_dynamic(fit_distribution_models[-window_size:], fit_total_distribution_model)
+                    sucess_flag = True if inference_rjsd <= rJSD_threshold and total_rjsd <= rJSD_threshold else False
+                    del fit_distribution_models
+                    if rjsds_path.exists():
+                        with open(rjsds_path, 'rb') as f:
+                            rjsds = pickle.load(f)
+                            tmp_rjsds = rjsds.copy()
+                            del rjsds
+                        tmp_rjsds['inference'].append(inference_rjsd)
+                        tmp_rjsds['total'].append(total_rjsd)
+                    else:
+                        tmp_rjsds = dict(
+                            inference = list(),
+                            total = list()
+                        )
+                        tmp_rjsds['inference'].append(inference_rjsd)
+                        tmp_rjsds['total'].append(total_rjsd)
+                    with open(rjsds_path, 'wb') as f:
+                        pickle.dump(tmp_rjsds, f)
+                    draw_rjsds(tmp_rjsds, results_basepath) 
+                    del tmp_rjsds
+                del tmp_results
+                del tmp_fit_distribution_models
+                del all_total_times
+                del all_inference_times
+
             fake_run = False
             
-            print('-------after_inference-------')
-            print(f'in loop {loop}:', loop)
-            print(f'in already_run_number: {already_run_number}')
-            print('already_batch_number: ', already_batch_number)
-            print('warm_batch_number: ', warm_batch_number)
-            print('fitted_models: ', len(fit_distribution_models))
-            print('rjsds_nums:', len(rjsds))
-            if already_run_number == test_run:
-                break 
+            print(f'-------after inference {loop}-------')
+            print(f'already_run: {already_run}')
+            print(f'warm_run: {warm_run}')
 
-    with open(result_path, 'w') as f:
-        json.dump(results, f, indent=2)
-    with open(rjsds_path, 'w') as f:
-        json.dump(rjsds, f, indent=2)
-    with open(fit_distribution_path, 'wb') as f:
-        pickle.dump(fit_distribution_models, f)
-    draw_rjsds(rjsds, results_basepath) 
+            if already_run == max_run:
+                break 
+            
+
+            
     
 
