@@ -1,3 +1,4 @@
+import sys
 import time
 import json
 import numpy
@@ -22,8 +23,53 @@ import model
 import register
 from register import dataset
 
-logger = logging.getLogger('my_logger')
-logger.setLevel(logging.DEBUG)
+
+def set_logger(
+    name: str,
+    mode: str = 'both',
+    level: str = 'INFO',
+    logging_filepath: pathlib.Path = None,
+    show_setting_log: bool = True
+):
+    assert mode in {'both', 'file', 'console'}, f'Not Support The Logging Mode - \'{mode}\'.'
+    assert level in {'INFO', 'WARN', 'ERROR', 'DEBUG', 'FATAL', 'NOTSET'}, f'Not Support The Logging Level - \'{level}\'.'
+
+    logging_filepath = pathlib.Path(logging_filepath) if isinstance(logging_filepath, str) else logging_filepath
+
+    logging_formatter = logging.Formatter("[%(asctime)s %(levelname)s] %(message)s")
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    logger.handlers.clear()
+
+    if mode in {'both', 'file'}:
+        if logging_filepath is None:
+            logging_dirpath = pathlib.Path(os.getcwd())
+            logging_filename = 'younger.log'
+            logging_filepath = logging_dirpath.joinpath(logging_filename)
+            print(f'Logging filepath is not specified, logging file will be saved in the working directory: \'{logging_dirpath}\', filename: \'{logging_filename}\'')
+        else:
+            logging_dirpath = logging_filepath.parent
+            logging_filename = logging_filepath.name
+            logging_filepath = str(logging_filepath)
+            print(f'Logging file will be saved in the directory: \'{logging_dirpath}\', filename: \'{logging_filename}\'')
+
+        file_handler = logging.FileHandler(logging_filepath, mode='a', encoding='utf-8')
+        file_handler.setLevel(level)
+        file_handler.setFormatter(logging_formatter)
+        logger.addHandler(file_handler)
+
+    if mode in {'both', 'console'}:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(level)
+        console_handler.setFormatter(logging_formatter)
+        logger.addHandler(console_handler)
+
+    logger.propagate = False
+
+    print(f'Logger: \'{name}\' - \'{mode}\' - \'{level}\'')
+
+    return logger
 
 
 def get_model_parameters_number(model: torch.nn.Module) -> int:
@@ -73,20 +119,20 @@ def check_fit_train_test(train_times, test_times, min_ns):
         ins_times = numpy.concatenate([train_time[:min_n], test_time])
         train_ins_times = train_time[:min_n].reshape(-1, 1)
         test_ins_times = test_time.reshape(-1, 1)
-        #print(f"No.{index+1} Fitting.")
+        #logger.info(f"No.{index+1} Fitting.")
         train_model = fit(train_ins_times, 'kde')
         test_model = fit(test_ins_times, 'kde')
         epsilon = 1e-8
         x = numpy.linspace(ins_times.min(), ins_times.max(), 1000).reshape(-1, 1)
         js_dis = jensenshannon(numpy.exp(train_model.score_samples(x))+epsilon, numpy.exp(test_model.score_samples(x))+epsilon)
         #js_dis = pow(jensenshannon(numpy.exp(train_model.score_samples(x))+epsilon, numpy.exp(test_model.score_samples(x))+epsilon), 2)
-        #print(f"No.{index} JSD: {js_dis:.3f}")
+        #logger.info(f"No.{index} JSD: {js_dis:.3f}")
         total_js_dis += js_dis
 
     toc = time.perf_counter()
-    print(f"Total time consume: {toc-tic:.2f}s")
+    logger.info(f"Total time consume: {toc-tic:.2f}s")
     avg_jsd = total_js_dis/len(min_ns)
-    print(f"Avg JSD: {avg_jsd:.3f}")
+    logger.info(f"Avg JSD: {avg_jsd:.3f}")
     return numpy.sqrt(avg_jsd)
 
 
@@ -102,10 +148,10 @@ def check_fit_dynamic(fit_distribution_models, fit_distribution_model, all_times
         js_dis = jensenshannon(numpy.exp(current_distribution.score_samples(x))+epsilon, numpy.exp(compared_distribution.score_samples(x))+epsilon)
         total_js_dis += js_dis
     toc = time.perf_counter()
-    print(f"Total time consume: {toc-tic:.2f}s")
+    logger.info(f"Total time consume: {toc-tic:.2f}s")
     avg_jsd = total_js_dis/window_size
-    print(f"Avg JSD: {avg_jsd:.3f}")
-    print(f"rJSD: {numpy.sqrt(avg_jsd):.3f}")
+    logger.info(f"Avg JSD: {avg_jsd:.3f}")
+    logger.info(f"rJSD: {numpy.sqrt(avg_jsd):.3f}")
     return numpy.sqrt(avg_jsd)
 
 
@@ -140,7 +186,7 @@ def Inference(params):
     try:
         assert u_batch_size <= len(users) / 10
     except AssertionError:
-        print(f"test_u_batch_size is too big for this dataset, try a small one {len(users) // 10}")
+        logger.info(f"test_u_batch_size is too big for this dataset, try a small one {len(users) // 10}")
     users_list = []
     rating_list = []
     groundTrue_list = []
@@ -180,7 +226,7 @@ def Inference(params):
         postprocess_time = postprocess_end - postprocess_start
         total_time = preprocess_time + inference_time + postprocess_time
         tmp_total_dic[batch_id] = float(total_time)
-        # print('total_time, inference_time: ', total_time, inference_time)
+        # logger.info('total_time, inference_time: ', total_time, inference_time)
         a = time.perf_counter()
 
     assert total_batch == len(users_list)
@@ -244,6 +290,7 @@ if __name__ == "__main__":
     parser.add_argument('--max-run', type=int, default=0)
     args = parser.parse_args()
 
+
     results_basepath = pathlib.Path(args.results_basepath)
     min_run = args.min_run 
     warm_run = args.warm_run 
@@ -256,6 +303,7 @@ if __name__ == "__main__":
     result_path = results_basepath.joinpath('Light_GCN_Pytorch.pickle')
     rjsds_path = results_basepath.joinpath('Light_GCN_Pytorch_rjsds.pickle')
     fit_distribution_path = results_basepath.joinpath('Light_GCN_Pytorch_distributions.pickle')
+    logger = set_logger(name='Light_GCN_Pytorch', mode='both', level='INFO', logging_filepath=results_basepath.joinpath('Light_GCN_Pytorch.log'))
 
     total_batches = 0
     if result_path.exists():
@@ -269,13 +317,13 @@ if __name__ == "__main__":
     Recmodel = register.MODELS[world.model_name](world.config, dataset)
     Recmodel = Recmodel.to(world.device)
     weight_file = utils.getFileName()
-    print(f"load and save to {weight_file}")
+    logger.info(f"load and save to {weight_file}")
     if world.LOAD:
         try:
             Recmodel.load_state_dict(torch.load(weight_file, map_location=torch.device('cuda')))
-            print(f"loaded model weights from {weight_file}")
+            logger.info(f"loaded model weights from {weight_file}")
         except FileNotFoundError:
-            print(f"{weight_file} not exists, start from beginning")
+            logger.info(f"{weight_file} not exists, start from beginning")
     sucess_flag = False
     Recmodel.eval()
     loop = 0 # for debugging
@@ -286,15 +334,14 @@ if __name__ == "__main__":
             params = {
                 'dataset': dataset,
                 'Recmodel': Recmodel,
-                'fake_run': fake_run,
+                'fake_run': fake_run
             }
 
-            print(f'-------before inference {loop}-------')
-            print(f'already_run: {already_run}')
-            print(f'warm_run: {warm_run}')
+            logger.info(f'-------before inference {loop}-------')
+            logger.info(f'already_run: {already_run}')
+            logger.info(f'warm_run: {warm_run}')
             
             tmp_inference_dic, tmp_total_dic = Inference(params)
-            # print(result)
             if not fake_run:
                 already_run += 1   
                 all_inference_times = list()
@@ -334,24 +381,24 @@ if __name__ == "__main__":
                     with open(fit_distribution_path, 'rb') as f:
                         fit_distribution_models = pickle.load(f)
                         tmp_fit_distribution_models = fit_distribution_models.copy()
+                        del fit_distribution_models 
                         
-                    tmp_fit_distribution_models['inference'].append(fit_inference_distribution_model)
-                    tmp_fit_distribution_models['total'].append(fit_total_distribution_model)
                 else:
                     tmp_fit_distribution_models = dict(
                         inference = list(),
                         total = list()
                     )
-                    tmp_fit_distribution_models['inference'].append(fit_inference_distribution_model)
-                    tmp_fit_distribution_models['total'].append(fit_total_distribution_model)
-                with open(fit_distribution_path, 'wb') as f:
-                    pickle.dump(tmp_fit_distribution_models, f)
-
+                    
+                logger.info(f"len(tmp_fit_distribution_models['inference']) % window_size == {len(tmp_fit_distribution_models['inference']) % window_size}")
                 if len(tmp_fit_distribution_models['inference']) % window_size == 0 and len(tmp_fit_distribution_models['inference']) != 0:
-                    inference_rjsd = check_fit_dynamic(fit_distribution_models[-window_size:], fit_inference_distribution_model)
-                    total_rjsd = check_fit_dynamic(fit_distribution_models[-window_size:], fit_total_distribution_model)
+                    inference_rjsd = check_fit_dynamic(tmp_fit_distribution_models['inference'][-window_size:], fit_inference_distribution_model, all_inference_times, window_size)
+                    total_rjsd = check_fit_dynamic(tmp_fit_distribution_models['total'][-window_size:], fit_total_distribution_model, all_total_times, window_size)
+                    logger.info(f'inference_rjsd is {inference_rjsd} / total_rjsd is {total_rjsd}')
                     sucess_flag = True if inference_rjsd <= rJSD_threshold and total_rjsd <= rJSD_threshold else False
-                    del fit_distribution_models
+                    if inference_rjsd <= rJSD_threshold:
+                        logger.info('inference_times has fitted') 
+                    if total_rjsd <= rJSD_threshold:
+                        logger.info('total_times has fitted') 
                     if rjsds_path.exists():
                         with open(rjsds_path, 'rb') as f:
                             rjsds = pickle.load(f)
@@ -370,16 +417,25 @@ if __name__ == "__main__":
                         pickle.dump(tmp_rjsds, f)
                     draw_rjsds(tmp_rjsds, results_basepath) 
                     del tmp_rjsds
+
+                tmp_fit_distribution_models['inference'].append(fit_inference_distribution_model)
+                tmp_fit_distribution_models['total'].append(fit_total_distribution_model)
+                with open(fit_distribution_path, 'wb') as f:
+                    pickle.dump(tmp_fit_distribution_models, f)
+
                 del tmp_results
                 del tmp_fit_distribution_models
                 del all_total_times
                 del all_inference_times
 
-            fake_run = False
             
-            print(f'-------after inference {loop}-------')
-            print(f'already_run: {already_run}')
-            print(f'warm_run: {warm_run}')
+            logger.info(f'-------after inference {loop}-------')
+            logger.info(f'already_run: {already_run}')
+            logger.info(f'warm_run: {warm_run}')
+            if fake_run:
+                logger.info(f'this run is fake')
+
+            fake_run = False
 
             if already_run == max_run:
                 break 
