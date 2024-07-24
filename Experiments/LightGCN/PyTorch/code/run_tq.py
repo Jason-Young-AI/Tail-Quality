@@ -114,7 +114,6 @@ def fit(ins_times, fit_type='kde'):
 
 
 def check_fit_dynamic(fit_distribution_models, fit_distribution_model, all_times, window_size):
-    tic = time.perf_counter()
     total_js_dis = 0
     all_times = numpy.array(all_times)
     current_distribution = fit_distribution_model 
@@ -124,12 +123,7 @@ def check_fit_dynamic(fit_distribution_models, fit_distribution_model, all_times
         x = numpy.linspace(all_times.min(), all_times.max(), 1000).reshape(-1, 1) 
         js_dis = jensenshannon(numpy.exp(current_distribution.score_samples(x))+epsilon, numpy.exp(compared_distribution.score_samples(x))+epsilon)
         total_js_dis += js_dis
-        print(js_dis)
-    toc = time.perf_counter()
-    logger.info(f"Total time consume: {toc-tic:.2f}s")
     avg_jsd = total_js_dis/window_size
-    logger.info(f"Avg JSD: {avg_jsd:.4f}")
-    logger.info(f"rJSD: {numpy.sqrt(avg_jsd):.3f}")
     return numpy.sqrt(avg_jsd)
 
 
@@ -249,6 +243,7 @@ def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
     
     ax.set_ylabel('rJSD')
     ax.grid(True)
+    ax.legend()
     plt.savefig(results_basepath.joinpath("Light_GCN_Pytorch_rjsds.jpg"), format="jpg")
     plt.savefig(results_basepath.joinpath("Light_GCN_Pytorch_rjsds.pdf"), format="pdf")
 
@@ -308,7 +303,6 @@ if __name__ == "__main__":
             logger.info(f"{weight_file} not exists, start from beginning")
     sucess_flag = False
     Recmodel.eval()
-    logger.info(f'fit_distribution_number is {fit_distribution_number}')
     loop = 0 # for debugging
     with torch.no_grad():
         while not sucess_flag:
@@ -351,78 +345,76 @@ if __name__ == "__main__":
                     )
                     tmp_results['inference'].append(tmp_inference_dic)
                     tmp_results['total'].append(tmp_total_dic)
-                with open(result_path, 'wb') as f:
-                    pickle.dump(tmp_results, f)
 
                 for key, value in tmp_inference_dic.items():
                     all_inference_times.append(value)
                 for key, value in tmp_total_dic.items():
                     all_total_times.append(value)
+
+                logger.info(f'(already_run - warm_run) % fit_run_number == {(already_run - warm_run) % fit_run_number}') 
+                logger.info(f"fit_distribution_number % window_size == {fit_distribution_number % window_size}")
                 if (already_run - warm_run) % fit_run_number == 0 and already_run != warm_run:
                     fit_inference_distribution_model = fit(all_inference_times) 
                     fit_total_distribution_model = fit(all_total_times)
-                logger.info(f'(already_run - warm_run) % fit_run_number == {(already_run - warm_run) % fit_run_number}') 
-                logger.info(f"fit_distribution_number % window_size == {fit_distribution_number % window_size}")
-                if fit_distribution_number % window_size == 0 and fit_distribution_number != 0:
-                    inference_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'inference'], key=lambda x: int(x.stem.split('-')[-1]))
-                    total_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'total'], key=lambda x: int(x.stem.split('-')[-1]))
-                    fit_inference_distribution_models = list()
-                    fit_total_distribution_models = list() 
-                    for inference_model_path in inference_model_paths[-window_size:]:
-                        with open(inference_model_path, 'rb') as f:
-                            distribution_model = pickle.load(f)
-                            fit_inference_distribution_models.append(distribution_model) 
-                    for total_model_path in total_model_paths[-window_size:]:
-                        with open(total_model_path, 'rb') as f:
-                            distribution_model = pickle.load(f)
-                            fit_total_distribution_models.append(distribution_model)
-                            
-                    logger.info(f'start_check_fit')
-                    inference_rjsd = check_fit_dynamic(fit_inference_distribution_models, fit_inference_distribution_model, all_inference_times, window_size)
-                    total_rjsd = check_fit_dynamic(fit_total_distribution_models, fit_total_distribution_model, all_total_times, window_size)
-                    logger.info(f'total_rjsd1: {total_rjsd}')
-                    total_rjsd = check_fit_dynamic(fit_total_distribution_models, fit_total_distribution_model, all_total_times, window_size)
-                    logger.info(f'total_rjsd2: {total_rjsd}')
-                    logger.info(f'end_check_fit')
-                    del fit_inference_distribution_models
-                    del fit_total_distribution_models
+                    if fit_distribution_number % window_size == 0 and fit_distribution_number != 0:
+                        inference_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'inference'], key=lambda x: int(x.stem.split('-')[-1]))
+                        total_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'total'], key=lambda x: int(x.stem.split('-')[-1]))
+                        fit_inference_distribution_models = list()
+                        fit_total_distribution_models = list() 
+                        for inference_model_path in inference_model_paths[-window_size:]:
+                            with open(inference_model_path, 'rb') as f:
+                                distribution_model = pickle.load(f)
+                                fit_inference_distribution_models.append(distribution_model) 
+                        for total_model_path in total_model_paths[-window_size:]:
+                            with open(total_model_path, 'rb') as f:
+                                distribution_model = pickle.load(f)
+                                fit_total_distribution_models.append(distribution_model)
+                                
+                        logger.info(f'start_check_fit')
+                        inference_rjsd = check_fit_dynamic(fit_inference_distribution_models, fit_inference_distribution_model, all_inference_times, window_size)
+                        total_rjsd = check_fit_dynamic(fit_total_distribution_models, fit_total_distribution_model, all_total_times, window_size)
+                        logger.info(f'end_check_fit')
+                        del fit_inference_distribution_models
+                        del fit_total_distribution_models
 
-                    logger.info(f'inference_rjsd is {inference_rjsd} / total_rjsd is {total_rjsd}')
-                    sucess_flag = True if inference_rjsd <= rJSD_threshold and total_rjsd <= rJSD_threshold else False
-                    if inference_rjsd <= rJSD_threshold:
-                        logger.info('inference_times has fitted') 
-                    if total_rjsd <= rJSD_threshold:
-                        logger.info('total_times has fitted') 
-                    logger.info(f'start_draw_rjsds')
-                    if rjsds_path.exists():
-                        with open(rjsds_path, 'rb') as f:
-                            rjsds = pickle.load(f)
-                            tmp_rjsds = rjsds.copy()
-                            del rjsds
-                        tmp_rjsds['inference'].append(inference_rjsd)
-                        tmp_rjsds['total'].append(total_rjsd)
-                    else:
-                        tmp_rjsds = dict(
-                            inference = list(),
-                            total = list()
-                        )
-                        tmp_rjsds['inference'].append(inference_rjsd)
-                        tmp_rjsds['total'].append(total_rjsd)
-                    with open(rjsds_path, 'wb') as f:
-                        pickle.dump(tmp_rjsds, f)
-                    draw_rjsds(tmp_rjsds, results_basepath) 
-                    del tmp_rjsds
-                    logger.info(f'end_draw_rjsds')
+                        logger.info(f'inference_rjsd is {inference_rjsd} / total_rjsd is {total_rjsd}')
+                        sucess_flag = True if inference_rjsd <= rJSD_threshold and total_rjsd <= rJSD_threshold else False
+                        if inference_rjsd <= rJSD_threshold:
+                            logger.info('inference_times has fitted') 
+                        if total_rjsd <= rJSD_threshold:
+                            logger.info('total_times has fitted') 
+                        logger.info(f'start_draw_rjsds')
+                        if rjsds_path.exists():
+                            with open(rjsds_path, 'rb') as f:
+                                rjsds = pickle.load(f)
+                                tmp_rjsds = rjsds.copy()
+                                del rjsds
+                            tmp_rjsds['inference'].append(inference_rjsd)
+                            tmp_rjsds['total'].append(total_rjsd)
+                        else:
+                            tmp_rjsds = dict(
+                                inference = list(),
+                                total = list()
+                            )
+                            tmp_rjsds['inference'].append(inference_rjsd)
+                            tmp_rjsds['total'].append(total_rjsd)
+                        with open(rjsds_path, 'wb') as f:
+                            pickle.dump(tmp_rjsds, f)
+                        draw_rjsds(tmp_rjsds, results_basepath) 
+                        del tmp_rjsds
+                        logger.info(f'end_draw_rjsds')
 
-                if (already_run - warm_run) % fit_run_number == 0 and already_run != warm_run:
+                
                     fit_distribution_number += 1
                     with open(fit_distribution_dir.joinpath(f'inference-{fit_distribution_number}.pickle'), 'wb') as f:
                         pickle.dump(fit_inference_distribution_model, f)
                     with open(fit_distribution_dir.joinpath(f'total-{fit_distribution_number}.pickle'), 'wb') as f:
                         pickle.dump(fit_total_distribution_model, f)
-                    # del fit_inference_distribution_model
-                    # del fit_total_distribution_model 
+                    del fit_inference_distribution_model
+                    del fit_total_distribution_model 
                     
+                with open(result_path, 'wb') as f:
+                    pickle.dump(tmp_results, f)
                 del tmp_results
                 del all_total_times
                 del all_inference_times
