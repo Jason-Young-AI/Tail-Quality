@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import json
@@ -112,30 +113,6 @@ def fit(ins_times, fit_type='kde'):
     return distribution_model
 
 
-def check_fit_train_test(train_times, test_times, min_ns):
-    tic = time.perf_counter()
-    total_js_dis = 0
-    for index, (train_time, test_time, min_n) in enumerate(zip(train_times, test_times, min_ns)):
-        ins_times = numpy.concatenate([train_time[:min_n], test_time])
-        train_ins_times = train_time[:min_n].reshape(-1, 1)
-        test_ins_times = test_time.reshape(-1, 1)
-        #logger.info(f"No.{index+1} Fitting.")
-        train_model = fit(train_ins_times, 'kde')
-        test_model = fit(test_ins_times, 'kde')
-        epsilon = 1e-8
-        x = numpy.linspace(ins_times.min(), ins_times.max(), 1000).reshape(-1, 1)
-        js_dis = jensenshannon(numpy.exp(train_model.score_samples(x))+epsilon, numpy.exp(test_model.score_samples(x))+epsilon)
-        #js_dis = pow(jensenshannon(numpy.exp(train_model.score_samples(x))+epsilon, numpy.exp(test_model.score_samples(x))+epsilon), 2)
-        #logger.info(f"No.{index} JSD: {js_dis:.3f}")
-        total_js_dis += js_dis
-
-    toc = time.perf_counter()
-    logger.info(f"Total time consume: {toc-tic:.2f}s")
-    avg_jsd = total_js_dis/len(min_ns)
-    logger.info(f"Avg JSD: {avg_jsd:.3f}")
-    return numpy.sqrt(avg_jsd)
-
-
 def check_fit_dynamic(fit_distribution_models, fit_distribution_model, all_times, window_size):
     tic = time.perf_counter()
     total_js_dis = 0
@@ -147,10 +124,11 @@ def check_fit_dynamic(fit_distribution_models, fit_distribution_model, all_times
         x = numpy.linspace(all_times.min(), all_times.max(), 1000).reshape(-1, 1) 
         js_dis = jensenshannon(numpy.exp(current_distribution.score_samples(x))+epsilon, numpy.exp(compared_distribution.score_samples(x))+epsilon)
         total_js_dis += js_dis
+        print(js_dis)
     toc = time.perf_counter()
     logger.info(f"Total time consume: {toc-tic:.2f}s")
     avg_jsd = total_js_dis/window_size
-    logger.info(f"Avg JSD: {avg_jsd:.3f}")
+    logger.info(f"Avg JSD: {avg_jsd:.4f}")
     logger.info(f"rJSD: {numpy.sqrt(avg_jsd):.3f}")
     return numpy.sqrt(avg_jsd)
 
@@ -181,7 +159,7 @@ def Inference(params):
     # eval mode with no dropout
 
     max_K = max(world.topks)
-    
+
     users = list(testDict.keys())
     try:
         assert u_batch_size <= len(users) / 10
@@ -302,14 +280,18 @@ if __name__ == "__main__":
 
     result_path = results_basepath.joinpath('Light_GCN_Pytorch.pickle')
     rjsds_path = results_basepath.joinpath('Light_GCN_Pytorch_rjsds.pickle')
-    fit_distribution_path = results_basepath.joinpath('Light_GCN_Pytorch_distributions.pickle')
-    logger = set_logger(name='Light_GCN_Pytorch', mode='both', level='INFO', logging_filepath=results_basepath.joinpath('Light_GCN_Pytorch.log'))
+    fit_distribution_dir = results_basepath.joinpath('distributions')
+    if not fit_distribution_dir.exists():
+        fit_distribution_dir.mkdir(parents=True, exist_ok=True)
+    fit_distribution_model_paths = list(fit_distribution_dir.iterdir())
+    fit_distribution_number = len(fit_distribution_model_paths)//2
 
+    logger = set_logger(name='Light_GCN_Pytorch', mode='both', level='INFO', logging_filepath=results_basepath.joinpath('Light_GCN_Pytorch.log'))
     total_batches = 0
     if result_path.exists():
         with open (result_path, 'rb') as f:
             results = pickle.load(f)
-        already_run = len(results)
+        already_run = len(results['inference'])
         del results
     else:
         already_run = 0
@@ -326,8 +308,8 @@ if __name__ == "__main__":
             logger.info(f"{weight_file} not exists, start from beginning")
     sucess_flag = False
     Recmodel.eval()
+    logger.info(f'fit_distribution_number is {fit_distribution_number}')
     loop = 0 # for debugging
-
     with torch.no_grad():
         while not sucess_flag:
             loop += 1 # for debugging
@@ -337,13 +319,16 @@ if __name__ == "__main__":
                 'fake_run': fake_run
             }
 
-            logger.info(f'-------before inference {loop}-------')
+            logger.info(f'-------before loop {loop}-------')
             logger.info(f'already_run: {already_run}')
             logger.info(f'warm_run: {warm_run}')
+            logger.info(f'fit_distribution_number: {fit_distribution_number}')
             
             tmp_inference_dic, tmp_total_dic = Inference(params)
+            logger.info(f'after inference')
             if not fake_run:
-                already_run += 1   
+                already_run += 1 
+                logger.info(f'already_run: {already_run}')  
                 all_inference_times = list()
                 all_total_times = list() 
                 if result_path.exists(): 
@@ -373,32 +358,42 @@ if __name__ == "__main__":
                     all_inference_times.append(value)
                 for key, value in tmp_total_dic.items():
                     all_total_times.append(value)
-                if (already_run - warm_run) % fit_run_number == 0:
+                if (already_run - warm_run) % fit_run_number == 0 and already_run != warm_run:
                     fit_inference_distribution_model = fit(all_inference_times) 
-                    fit_total_distribution_model = fit(all_total_times) 
+                    fit_total_distribution_model = fit(all_total_times)
+                logger.info(f'(already_run - warm_run) % fit_run_number == {(already_run - warm_run) % fit_run_number}') 
+                logger.info(f"fit_distribution_number % window_size == {fit_distribution_number % window_size}")
+                if fit_distribution_number % window_size == 0 and fit_distribution_number != 0:
+                    inference_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'inference'], key=lambda x: int(x.stem.split('-')[-1]))
+                    total_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'total'], key=lambda x: int(x.stem.split('-')[-1]))
+                    fit_inference_distribution_models = list()
+                    fit_total_distribution_models = list() 
+                    for inference_model_path in inference_model_paths[-window_size:]:
+                        with open(inference_model_path, 'rb') as f:
+                            distribution_model = pickle.load(f)
+                            fit_inference_distribution_models.append(distribution_model) 
+                    for total_model_path in total_model_paths[-window_size:]:
+                        with open(total_model_path, 'rb') as f:
+                            distribution_model = pickle.load(f)
+                            fit_total_distribution_models.append(distribution_model)
+                            
+                    logger.info(f'start_check_fit')
+                    inference_rjsd = check_fit_dynamic(fit_inference_distribution_models, fit_inference_distribution_model, all_inference_times, window_size)
+                    total_rjsd = check_fit_dynamic(fit_total_distribution_models, fit_total_distribution_model, all_total_times, window_size)
+                    logger.info(f'total_rjsd1: {total_rjsd}')
+                    total_rjsd = check_fit_dynamic(fit_total_distribution_models, fit_total_distribution_model, all_total_times, window_size)
+                    logger.info(f'total_rjsd2: {total_rjsd}')
+                    logger.info(f'end_check_fit')
+                    del fit_inference_distribution_models
+                    del fit_total_distribution_models
 
-                if fit_distribution_path.exists():
-                    with open(fit_distribution_path, 'rb') as f:
-                        fit_distribution_models = pickle.load(f)
-                        tmp_fit_distribution_models = fit_distribution_models.copy()
-                        del fit_distribution_models 
-                        
-                else:
-                    tmp_fit_distribution_models = dict(
-                        inference = list(),
-                        total = list()
-                    )
-                    
-                logger.info(f"len(tmp_fit_distribution_models['inference']) % window_size == {len(tmp_fit_distribution_models['inference']) % window_size}")
-                if len(tmp_fit_distribution_models['inference']) % window_size == 0 and len(tmp_fit_distribution_models['inference']) != 0:
-                    inference_rjsd = check_fit_dynamic(tmp_fit_distribution_models['inference'][-window_size:], fit_inference_distribution_model, all_inference_times, window_size)
-                    total_rjsd = check_fit_dynamic(tmp_fit_distribution_models['total'][-window_size:], fit_total_distribution_model, all_total_times, window_size)
                     logger.info(f'inference_rjsd is {inference_rjsd} / total_rjsd is {total_rjsd}')
                     sucess_flag = True if inference_rjsd <= rJSD_threshold and total_rjsd <= rJSD_threshold else False
                     if inference_rjsd <= rJSD_threshold:
                         logger.info('inference_times has fitted') 
                     if total_rjsd <= rJSD_threshold:
                         logger.info('total_times has fitted') 
+                    logger.info(f'start_draw_rjsds')
                     if rjsds_path.exists():
                         with open(rjsds_path, 'rb') as f:
                             rjsds = pickle.load(f)
@@ -417,21 +412,26 @@ if __name__ == "__main__":
                         pickle.dump(tmp_rjsds, f)
                     draw_rjsds(tmp_rjsds, results_basepath) 
                     del tmp_rjsds
+                    logger.info(f'end_draw_rjsds')
 
-                tmp_fit_distribution_models['inference'].append(fit_inference_distribution_model)
-                tmp_fit_distribution_models['total'].append(fit_total_distribution_model)
-                with open(fit_distribution_path, 'wb') as f:
-                    pickle.dump(tmp_fit_distribution_models, f)
-
+                if (already_run - warm_run) % fit_run_number == 0 and already_run != warm_run:
+                    fit_distribution_number += 1
+                    with open(fit_distribution_dir.joinpath(f'inference-{fit_distribution_number}.pickle'), 'wb') as f:
+                        pickle.dump(fit_inference_distribution_model, f)
+                    with open(fit_distribution_dir.joinpath(f'total-{fit_distribution_number}.pickle'), 'wb') as f:
+                        pickle.dump(fit_total_distribution_model, f)
+                    # del fit_inference_distribution_model
+                    # del fit_total_distribution_model 
+                    
                 del tmp_results
-                del tmp_fit_distribution_models
                 del all_total_times
                 del all_inference_times
 
             
-            logger.info(f'-------after inference {loop}-------')
+            logger.info(f'-------after loop {loop}-------')
             logger.info(f'already_run: {already_run}')
             logger.info(f'warm_run: {warm_run}')
+            logger.info(f'fit_distribution_number: {fit_distribution_number}')
             if fake_run:
                 logger.info(f'this run is fake')
 
