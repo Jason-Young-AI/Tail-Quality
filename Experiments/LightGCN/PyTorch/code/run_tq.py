@@ -353,7 +353,7 @@ if __name__ == "__main__":
 
                 logger.info(f'(already_run - warm_run) % fit_run_number == {(already_run - warm_run) % fit_run_number}') 
                 logger.info(f"fit_distribution_number % window_size == {fit_distribution_number % window_size}")
-                if (already_run - warm_run) % fit_run_number == 0 and already_run != warm_run:
+                if already_run > warm_run and (already_run - warm_run) % fit_run_number == 0:
                     fit_inference_distribution_model = fit(all_inference_times) 
                     fit_total_distribution_model = fit(all_total_times)
                     if fit_distribution_number % window_size == 0 and fit_distribution_number != 0:
@@ -365,10 +365,12 @@ if __name__ == "__main__":
                             with open(inference_model_path, 'rb') as f:
                                 distribution_model = pickle.load(f)
                                 fit_inference_distribution_models.append(distribution_model) 
+                        del inference_model_paths
                         for total_model_path in total_model_paths[-window_size:]:
                             with open(total_model_path, 'rb') as f:
                                 distribution_model = pickle.load(f)
                                 fit_total_distribution_models.append(distribution_model)
+                        del total_model_paths
                                 
                         logger.info(f'start_check_fit')
                         inference_rjsd = check_fit_dynamic(fit_inference_distribution_models, fit_inference_distribution_model, all_inference_times, window_size)
