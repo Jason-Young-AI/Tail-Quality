@@ -280,9 +280,6 @@ if __name__ == "__main__":
         fit_distribution_dir.mkdir(parents=True, exist_ok=True)
     fit_distribution_model_paths = list(fit_distribution_dir.iterdir())
     fit_distribution_number = len(fit_distribution_model_paths)//2
-
-    logger = set_logger(name='Light_GCN_Pytorch', mode='both', level='INFO', logging_filepath=results_basepath.joinpath('Light_GCN_Pytorch.log'))
-    total_batches = 0
     if result_path.exists():
         with open (result_path, 'rb') as f:
             results = pickle.load(f)
@@ -290,6 +287,9 @@ if __name__ == "__main__":
         del results
     else:
         already_run = 0
+
+    logger = set_logger(name='Light_GCN_Pytorch', mode='both', level='INFO', logging_filepath=results_basepath.joinpath('Light_GCN_Pytorch.log'))
+    total_batches = 0
 
     Recmodel = register.MODELS[world.model_name](world.config, dataset)
     Recmodel = Recmodel.to(world.device)
@@ -301,9 +301,9 @@ if __name__ == "__main__":
             logger.info(f"loaded model weights from {weight_file}")
         except FileNotFoundError:
             logger.info(f"{weight_file} not exists, start from beginning")
-    sucess_flag = False
     Recmodel.eval()
     loop = 0 # for debugging
+    sucess_flag = False
     with torch.no_grad():
         while not sucess_flag:
             loop += 1 # for debugging
