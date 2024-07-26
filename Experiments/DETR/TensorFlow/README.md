@@ -5,9 +5,13 @@
     * DETR-R101 for batch size 2: detr-r101-2c7b67e5.h5
 
 1. One may want to know how to convert PyTorch weights to TensorFlow, please refer to [this issue](https://github.com/Leonardo-Blanger/detr_tensorflow/issues/2#issuecomment-730008815), below is a snapshot:
+    0. Env
+    ```
+    pip install onnx onnx_tf tensorflow_probability
+    ```
     1. Convert pytorch model to onnx format: load your pytorch detr model and use .eval() to convert it to an inference model. Then create a dummy variable input and feed it to the export() method. Make sure to set `opset_version=11`
     ```
-    dummy_input = Variable(torch.randn(1, 3, 800, 1777))
+    dummy_input = Variable(torch.randn(1, 3, 800, 1777)).to('cuda:0')
 
     # you may change the names
     input_names = ['input_image']
