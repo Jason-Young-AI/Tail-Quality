@@ -228,6 +228,7 @@ def inference(parameters):
     llm = parameters['llm']
     batch_size = parameters['batch_size']
     number_train = parameters['number_train']
+    results_basepath = parameters['results_basepath']
 
     tmp_inference_dic = dict()
     tmp_total_dic = dict()
@@ -304,8 +305,8 @@ def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
     ax.set_ylabel('rJSD')
     ax.grid(True)
     ax.legend()
-    plt.savefig(results_basepath.joinpath("Light_GCN_Pytorch_rjsds.jpg"), format="jpg")
-    plt.savefig(results_basepath.joinpath("Light_GCN_Pytorch_rjsds.pdf"), format="pdf")
+    plt.savefig(results_basepath.joinpath("Vicuna_Pytorch_rjsds.jpg"), format="jpg")
+    plt.savefig(results_basepath.joinpath("Vicuna_Pytorch_rjsds.pdf"), format="pdf")
 
 
 if __name__ == "__main__":
@@ -359,15 +360,15 @@ if __name__ == "__main__":
     fake_run = args.fake_run
     max_run = args.max_run
 
-    result_path = results_basepath.joinpath('Light_GCN_Pytorch.pickle')
-    rjsds_path = results_basepath.joinpath('Light_GCN_Pytorch_rjsds.pickle')
+    result_path = results_basepath.joinpath('Vicuna_Pytorch.pickle')
+    rjsds_path = results_basepath.joinpath('Vicuna_Pytorch_rjsds.pickle')
     fit_distribution_dir = results_basepath.joinpath('distributions')
     if not fit_distribution_dir.exists():
         fit_distribution_dir.mkdir(parents=True, exist_ok=True)
     fit_distribution_model_paths = list(fit_distribution_dir.iterdir())
     fit_distribution_number = len(fit_distribution_model_paths)//2
 
-    logger = set_logger(name='Light_GCN_Pytorch', mode='both', level='INFO', logging_filepath=results_basepath.joinpath('Light_GCN_Pytorch.log'))
+    logger = set_logger(name='Vicuna_Pytorch', mode='both', level='INFO', logging_filepath=results_basepath.joinpath('Vicuna_Pytorch.log'))
     total_batches = 0
     if result_path.exists():
         with open (result_path, 'rb') as f:
@@ -396,6 +397,7 @@ if __name__ == "__main__":
                 'fake_run': fake_run,
                 'batch_size': args.batch_size,
                 'number_train': args.number_train,
+                'results_basepath': results_basepath,
             }
 
             logger.info(f'-------before loop {loop}-------')
