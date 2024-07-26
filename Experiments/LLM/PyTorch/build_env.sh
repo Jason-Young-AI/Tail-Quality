@@ -4,5 +4,5 @@ source ${CONDA_PREFIX}/bin/activate TQ_LLM_PyTorch
 echo ${CONDA_PREFIX}
 pip install --upgrade pip
 pip install transformers
-pip install tensor_parallel
+pip install tensor_parallel pandas scikit-learn matplotlib sentencepiece accelerate
 pip install YoungToolkit pycocotools pandas accelerate sentencepiece
