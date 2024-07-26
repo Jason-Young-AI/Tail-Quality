@@ -9,6 +9,7 @@
 *.cfg
 *.sqlite3
 checkpoints/
+checkpoints-backup/
 runs/
 __pycache__/
 *.npy

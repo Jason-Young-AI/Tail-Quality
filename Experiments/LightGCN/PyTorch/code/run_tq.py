@@ -142,7 +142,7 @@ def test_one_batch(X):
                 'ndcg':np.array(ndcg)}
 
 
-def Inference(params):
+def inference(params):
     dataset = params['dataset']
     Recmodel = params['Recmodel']
     fake_run = params['fake_run']
@@ -250,7 +250,6 @@ def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Multiple times on the Whole Test Dataset")
-    parser.add_argument('--min-run', type=int, required=False)
     parser.add_argument('--batch-size', type=int, default=1) # for LightGCN, using the offical method to set batch-size
     parser.add_argument('--dataset-path', type=str, default="") # for LightGCN, using the offical method to load dataset
     parser.add_argument('--results-basepath', type=str, required=True)
@@ -260,12 +259,11 @@ if __name__ == "__main__":
     parser.add_argument('--window-size', type=int, default=5)
     parser.add_argument('--fit-run-number', type=int, default=2)
     parser.add_argument('--rJSD-threshold', type=float, default=0.05)
-    parser.add_argument('--max-run', type=int, default=0)
+    parser.add_argument('--max-run', type=int, default=1000000)
     args = parser.parse_args()
 
 
     results_basepath = pathlib.Path(args.results_basepath)
-    min_run = args.min_run 
     warm_run = args.warm_run 
     window_size = args.window_size
     fit_run_number = args.fit_run_number
@@ -275,7 +273,7 @@ if __name__ == "__main__":
 
     result_path = results_basepath.joinpath('Light_GCN_Pytorch.pickle')
     rjsds_path = results_basepath.joinpath('Light_GCN_Pytorch_rjsds.pickle')
-    fit_distribution_dir = results_basepath.joinpath('distributions')
+    fit_distribution_dir = results_basepath.joinpath('Light_GCN_Pytorch_distributions')
     if not fit_distribution_dir.exists():
         fit_distribution_dir.mkdir(parents=True, exist_ok=True)
     fit_distribution_model_paths = list(fit_distribution_dir.iterdir())
@@ -302,6 +300,7 @@ if __name__ == "__main__":
         except FileNotFoundError:
             logger.info(f"{weight_file} not exists, start from beginning")
     Recmodel.eval()
+
     loop = 0 # for debugging
     sucess_flag = False
     with torch.no_grad():
@@ -318,8 +317,10 @@ if __name__ == "__main__":
             logger.info(f'warm_run: {warm_run}')
             logger.info(f'fit_distribution_number: {fit_distribution_number}')
             
-            tmp_inference_dic, tmp_total_dic = Inference(params)
-            logger.info(f'after inference')
+            logger.info(f'inference start')
+            tmp_inference_dic, tmp_total_dic = inference(params)
+            logger.info(f'inference end')
+            
             if not fake_run:
                 already_run += 1 
                 logger.info(f'already_run: {already_run}')  
@@ -406,7 +407,6 @@ if __name__ == "__main__":
                         del tmp_rjsds
                         logger.info(f'end_draw_rjsds')
 
-                
                     fit_distribution_number += 1
                     with open(fit_distribution_dir.joinpath(f'inference-{fit_distribution_number}.pickle'), 'wb') as f:
                         pickle.dump(fit_inference_distribution_model, f)
@@ -421,7 +421,6 @@ if __name__ == "__main__":
                 del all_total_times
                 del all_inference_times
 
-            
             logger.info(f'-------after loop {loop}-------')
             logger.info(f'already_run: {already_run}')
             logger.info(f'warm_run: {warm_run}')
