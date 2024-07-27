@@ -24,6 +24,8 @@ import numpy as np
 import model
 import register
 
+from KDEpy.bw_selection import improved_sheather_jones
+
 
 def set_logger(
     name: str,
@@ -103,9 +105,13 @@ def gmm_aic(n_components, ins_times):
 def fit(ins_times, fit_type='kde'):
     ins_times = numpy.array(ins_times).reshape(-1, 1)
     if fit_type == 'kde':
-        bandwidth_grid = [0.005, 0.01, 0.03, 0.07, 0.1]
-        best_bandwidth  = min(bandwidth_grid, key=lambda x: kde_aic(x, ins_times))
+        # bandwidth_grid = [0.005, 0.01, 0.03, 0.07, 0.1]
+        # best_bandwidth  = min(bandwidth_grid, key=lambda x: kde_aic(x, ins_times))
+        best_bandwidth = improved_sheather_jones(ins_times)
+        print('BW', best_bandwidth)
         distribution_model = KernelDensity(bandwidth=best_bandwidth).fit(ins_times)
+        # distribution_model = FFTKDE(kernel='gaussian', bw='ISJ').fit(ins_times)
+        # print(type(distribution_model))
     if fit_type == 'gmm':
         n_components_grid = [2, 3, 4, 5, 6]
         best_n_components = min(n_components_grid, key=lambda x: gmm_aic(x, ins_times))
@@ -122,6 +128,7 @@ def check_fit_dynamic(fit_distribution_models, fit_distribution_model, all_times
         epsilon = 1e-8
         x = numpy.linspace(all_times.min(), all_times.max(), 1000).reshape(-1, 1) 
         js_dis = jensenshannon(numpy.exp(current_distribution.score_samples(x))+epsilon, numpy.exp(compared_distribution.score_samples(x))+epsilon)
+        # js_dis = jensenshannon(current_distribution.evaluate(1000)+epsilon, compared_distribution.evaluate(1000)+epsilon)
         total_js_dis += js_dis
     avg_jsd = total_js_dis/window_size
     return numpy.sqrt(avg_jsd)
@@ -349,8 +356,14 @@ if __name__ == "__main__":
                 logger.info(f'(already_run - warm_run) % fit_run_number == {(already_run - warm_run) % fit_run_number}') 
                 logger.info(f"fit_distribution_number % window_size == {fit_distribution_number % window_size}")
                 if already_run > warm_run and (already_run - warm_run) % fit_run_number == 0:
+                    x_start = time.perf_counter()
                     fit_inference_distribution_model = fit(all_inference_times) 
+                    x_end = time.perf_counter()
+                    print('I', x_end - x_start)
+                    x_start = time.perf_counter()
                     fit_total_distribution_model = fit(all_total_times)
+                    x_end = time.perf_counter()
+                    print('T', x_end - x_start)
                     if fit_distribution_number % window_size == 0 and fit_distribution_number != 0:
                         inference_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'inference'], key=lambda x: int(x.stem.split('-')[-1]))
                         total_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'total'], key=lambda x: int(x.stem.split('-')[-1]))

@@ -26,6 +26,8 @@ from utils import read_jpeg_image, preprocess, cxcywh2xyxy, absolute2relative, x
 import time
 from detr import DETR
 
+from KDEpy.bw_selection import improved_sheather_jones
+
 
 def pad_images_and_masks(images, masks):
     max_h = 0
@@ -117,8 +119,9 @@ def gmm_aic(n_components, ins_times):
 def fit(ins_times, fit_type='kde'):
     ins_times = numpy.array(ins_times).reshape(-1, 1)
     if fit_type == 'kde':
-        bandwidth_grid = [0.005, 0.01, 0.03, 0.07, 0.1]
-        best_bandwidth  = min(bandwidth_grid, key=lambda x: kde_aic(x, ins_times))
+        # bandwidth_grid = [0.005, 0.01, 0.03, 0.07, 0.1]
+        # best_bandwidth  = min(bandwidth_grid, key=lambda x: kde_aic(x, ins_times))
+        best_bandwidth = improved_sheather_jones(ins_times)
         distribution_model = KernelDensity(bandwidth=best_bandwidth).fit(ins_times)
     if fit_type == 'gmm':
         n_components_grid = [2, 3, 4, 5, 6]
