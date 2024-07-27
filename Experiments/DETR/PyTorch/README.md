@@ -1,13 +1,30 @@
+## Quick Run
+0. Just Setup Environment with `Conda`:
+```
+./setup_env.sh
+```
+
+1. Setup Datasets MS-COCO:
+```
+./setup_datasets.sh
+```
+
+2. Get Model Weights:
+```
+./setup_model.sh
+```
+
+3. Directly Run Script:
+```
+./run_tq.sh
+```
+
 ## HowTo
 
-0. First of all, download DETR model weights from [facebookresearch/detr](https://github.com/facebookresearch/detr) to `${BIN_DIR}`, note that there are two types of pretrained model:
+0. First of all, download DETR model weight from [facebookresearch/detr](https://github.com/facebookresearch/detr) to `${BIN_DIR}`:
     * DETR-DC5-R101 for batch size 1:
     ```
     $ wget -P ${BIN_DIR} https://dl.fbaipublicfiles.com/detr/detr-r101-2c7b67e5.pth
-    ```
-    * DETR-R101 for batch size 2:
-    ```
-    $ wget -P ${BIN_DIR} https://dl.fbaipublicfiles.com/detr/detr-r101-dc5-a2e86def.pth
     ```
 
 1. Then, download Backbone(ResNet101) model weights from [torchvision](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet101.html#torchvision.models.ResNet101_Weights) to `${BIN_DIR}`, note that there are two types of pretrained model:

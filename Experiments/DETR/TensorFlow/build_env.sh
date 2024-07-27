@@ -1,6 +1,9 @@
 #!/bin/bash
-conda create -n TQ_DETR_TensorFlow python=3.9 -y
-source $CONDA_PREFIX/bin/activate TQ_DETR_TensorFlow
+source ./vars.sh
+
+conda create -n ${THIS_ENV_NAME} python=3.10 -y
+source $CONDA_PREFIX/bin/activate ${THIS_ENV_NAME}
+
 conda install -c conda-forge cudatoolkit=11.8.0 -y
 pip install nvidia-cudnn-cu11==8.6.0.163 --timeout 120
 mkdir -p $CONDA_PREFIX/etc/conda/activate.d
@@ -8,8 +11,8 @@ echo 'CUDNN_PATH=$(dirname $(python -c "import nvidia.cudnn;print(nvidia.cudnn._
 echo 'export LD_LIBRARY_PATH=$CONDA_PREFIX/lib/:$CUDNN_PATH/lib:$LD_LIBRARY_PATH' >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
 source $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
 
-pip install tensorflow==2.12.* --timeout 120 # 2.16.*
-pip install pycocotools tqdm --timeout 120
+pip install tensorflow==2.12.* --timeout 120 --no-input
+pip install pycocotools tqdm --timeout 120 --no-input
 
 python3 -c "import tensorflow as tf; print(tf.reduce_sum(tf.random.normal([1000, 1000])))"
 python3 -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
@@ -24,3 +27,5 @@ source $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
 # Copy libdevice file to the required path
 mkdir -p $CONDA_PREFIX/lib/nvvm/libdevice
 cp $CONDA_PREFIX/lib/libdevice.10.bc $CONDA_PREFIX/lib/nvvm/libdevice/
+
+pip install scikit-learn --no-input

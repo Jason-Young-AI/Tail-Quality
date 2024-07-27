@@ -256,7 +256,7 @@ def inference(parameters):
                     batch_image_size=result['batch_image_size'],
                 ))
 
-        with open(results_basepath.joinpath('DETR_TensorFlow_origin_quality.json'), 'w') as f:
+        with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
             json.dump(main_results, f, indent=2)
 
     return  tmp_inference_dic, tmp_total_dic
@@ -275,8 +275,8 @@ def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
     ax.set_ylabel('rJSD')
     ax.grid(True)
     ax.legend()
-    plt.savefig(results_basepath.joinpath("DETR_TensorFlow_rjsds.jpg"), format="jpg")
-    plt.savefig(results_basepath.joinpath("DETR_TensorFlow_rjsds.pdf"), format="pdf")
+    plt.savefig(results_basepath.joinpath("rJSDs.jpg"), format="jpg")
+    plt.savefig(results_basepath.joinpath("rJSDs.pdf"), format="pdf")
 
 
 if __name__ == "__main__":
@@ -315,15 +315,15 @@ if __name__ == "__main__":
     fake_run = args.fake_run
     max_run = args.max_run
 
-    result_path = results_basepath.joinpath('DETR_TensorFlow.pickle')
-    rjsds_path = results_basepath.joinpath('DETR_TensorFlow_rjsds.pickle')
-    fit_distribution_dir = results_basepath.joinpath('distributions')
+    result_path = results_basepath.joinpath('All_Times.pickle')
+    rjsds_path = results_basepath.joinpath('All_rJSDs.pickle')
+    fit_distribution_dir = results_basepath.joinpath('All_PDFs')
     if not fit_distribution_dir.exists():
         fit_distribution_dir.mkdir(parents=True, exist_ok=True)
     fit_distribution_model_paths = list(fit_distribution_dir.iterdir())
     fit_distribution_number = len(fit_distribution_model_paths)//2
 
-    logger = set_logger(name='DETR', mode='both', level='INFO', logging_filepath=results_basepath.joinpath('DETR_PyTorch.log'))
+    logger = set_logger(name='Tail-Quality', mode='both', level='INFO', logging_filepath=results_basepath.joinpath('Tail-Quality.log'))
     total_batches = 0
     if result_path.exists():
         with open (result_path, 'rb') as f:
