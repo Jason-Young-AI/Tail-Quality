@@ -209,17 +209,6 @@ def inference(params):
     for batch_id, x in enumerate(X, start=1):
         pre_results.append(test_one_batch(x))
         
-    if fake_run:
-        origin_quality = dict()   
-        for batch_id, result in enumerate(pre_results, start=1):
-            origin_quality[batch_id] = dict(
-                recall = float(result['recall'].item()),
-                precision = float(result['precision'].item()),
-                ndcg = float(result['ndcg'].item())
-            )
-        with open(results_basepath.joinpath('Light_GCN_Pytorch_origin_quality.json'), 'w') as f:
-            json.dump(origin_quality, f, indent=2)
-            
     return  tmp_inference_dic, tmp_total_dic
     
     # for result in pre_results: 
@@ -320,7 +309,7 @@ if __name__ == "__main__":
             logger.info(f'inference start')
             tmp_inference_dic, tmp_total_dic = inference(params)
             logger.info(f'inference end')
-            
+
             if not fake_run:
                 already_run += 1 
                 logger.info(f'already_run: {already_run}')  

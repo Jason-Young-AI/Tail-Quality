@@ -64,7 +64,6 @@ def set_logger(
     return logger
 
 
-
 def kde_aic(bandwidth, ins_times):
     kde = KernelDensity(bandwidth=bandwidth)
     kde.fit(ins_times)
@@ -144,6 +143,7 @@ def get_vocabs(file_paths, addi_file_path):
     torch.save(emotion_vocab.to_dict(), emotion_vocab_dict_path)
     torch.save(speaker_vocab.to_dict(), speaker_vocab_dict_path)
     torch.save(sentiment_vocab.to_dict(), sentiment_vocab_dict_path)
+
 
 def load_emorynlp_and_builddataset(file_path, train=False):
     speaker_vocab = vocab.UnkVocab.from_dict(torch.load(
@@ -528,11 +528,15 @@ if __name__ == '__main__':
                 if already_run > warm_run and (already_run - warm_run) % fit_run_number == 0:
                     fit_inference_distribution_model = fit(all_inference_times) 
                     fit_total_distribution_model = fit(all_total_times)
+                    logger.info(f'now there is a new fit_model and fit_distribution_number is not updated yet')
                     if fit_distribution_number % window_size == 0 and fit_distribution_number != 0:
+                        logger.info('start sort paths')
                         inference_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'inference'], key=lambda x: int(x.stem.split('-')[-1]))
                         total_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'total'], key=lambda x: int(x.stem.split('-')[-1]))
+                        logger.info('end sort paths')
                         fit_inference_distribution_models = list()
                         fit_total_distribution_models = list() 
+                        logger.info('start add')
                         for inference_model_path in inference_model_paths[-window_size:]:
                             with open(inference_model_path, 'rb') as f:
                                 distribution_model = pickle.load(f)
@@ -543,6 +547,7 @@ if __name__ == '__main__':
                                 distribution_model = pickle.load(f)
                                 fit_total_distribution_models.append(distribution_model)
                         del total_model_paths
+                        logger.info('end add')
                                 
                         logger.info(f'start_check_fit')
                         inference_rjsd = check_fit_dynamic(fit_inference_distribution_models, fit_inference_distribution_model, all_inference_times, window_size)
@@ -588,6 +593,7 @@ if __name__ == '__main__':
                     
                 with open(result_path, 'wb') as f:
                     pickle.dump(tmp_results, f)
+                    logger.info(f'len tmp_results["inference"] is {len(tmp_results["inference"])}')
                 del tmp_results
                 del all_total_times
                 del all_inference_times
