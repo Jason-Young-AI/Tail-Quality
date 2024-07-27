@@ -186,21 +186,25 @@ def add_other(coco_results, image_sizes, image_shape):
 
 
 def run_onnx(images, session):
-    io_binding = session.io_binding()
-    io_binding.bind_cpu_input('input_image', images)
-    pred_logits_shape = (1,100,92) 
-    pred_boxes_shape = (1,100,4)
-    pred_logits = torch.empty(pred_logits_shape, dtype=torch.float32, device='cuda:0').contiguous()
-    pred_boxes = torch.empty(pred_boxes_shape, dtype=torch.float32, device='cuda:0').contiguous()
-    io_binding.bind_output('pred_logits', element_type=numpy.float32, shape=pred_logits_shape, device_type='cuda', buffer_ptr=pred_logits.data_ptr())
-    io_binding.bind_output('pred_boxes', element_type=numpy.float32, shape=pred_boxes_shape, device_type='cuda', buffer_ptr=pred_boxes.data_ptr())
-    session.run_with_iobinding(io_binding)
-    pred_logits = torch.tensor(io_binding.copy_outputs_to_cpu()[0])
-    pred_boxes = torch.tensor(io_binding.copy_outputs_to_cpu()[1])
-    
+    # Plan A
+    # binding = session.io_binding()
+    # images = images.contiguous()
+    # # print(images.shape)
+    # binding.bind_input('input_image', element_type=numpy.float32, device_id=0, shape=tuple(images.shape), device_type='cuda', buffer_ptr=images.data_ptr())
+    # pred_logits_shape = (1,100,92)
+    # pred_boxes_shape = (1,100,4)
+    # pred_logits = torch.empty(pred_logits_shape, dtype=torch.float32, device='cuda:0').contiguous()
+    # pred_boxes = torch.empty(pred_boxes_shape, dtype=torch.float32, device='cuda:0').contiguous()
+    # binding.bind_output('pred_logits', element_type=numpy.float32, shape=pred_logits_shape, device_type='cuda', buffer_ptr=pred_logits.data_ptr())
+    # binding.bind_output('pred_boxes', element_type=numpy.float32, shape=pred_boxes_shape, device_type='cuda', buffer_ptr=pred_boxes.data_ptr())
+    # session.run_with_iobinding(binding)
+
+    # Plan B
+    pred_logits, pred_boxes = session.run(['pred_logits', 'pred_boxes'], {'input_image': images})
+
     results = dict(
-        pred_logits = pred_logits,
-        pred_boxes =  pred_boxes,
+        pred_logits = torch.from_numpy(pred_logits),
+        pred_boxes =  torch.from_numpy(pred_boxes),
     )
     return results
 
@@ -235,7 +239,10 @@ def inference(parameters):
 
         # images = nested_tensor_from_tensor_list(images).to('cuda:0')
         images = numpy.array(images)
-        image_sizes = torch.stack(image_sizes, dim=0).to('cuda:0')
+        # images = torch.from_numpy(numpy.array(images))
+        # images = torch.from_numpy(numpy.array(images)).to('cuda:0')
+        # image_sizes = torch.stack(image_sizes, dim=0).to('cuda:0')
+        image_sizes = torch.stack(image_sizes, dim=0)
 
         inference_start = time.perf_counter()
         preprocess_time = inference_start - a 
@@ -342,9 +349,15 @@ if __name__ == "__main__":
     # session = onnxruntime.InferenceSession(model_path,sess_options=options, providers=['CUDAExecutionProvider', 'CPUExecutionProvider']) 
     
     # X is numpy array on cpu
+
+    session_options = onnxruntime.SessionOptions()
+    # session_options.enable_profiling = True 
+    session_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_EXTENDED
+    # onnxruntime.set_default_logger_severity(1) 
     session = onnxruntime.InferenceSession(
             model_path,
-            providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
+            session_options=session_options,
+            providers=['CPUExecutionProvider']
     )
 
     # [!End] Model Initialization
