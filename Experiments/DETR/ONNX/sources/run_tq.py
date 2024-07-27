@@ -185,6 +185,26 @@ def add_other(coco_results, image_sizes, image_shape):
     return coco_results_with_other
 
 
+def run_onnx(images, session):
+    io_binding = session.io_binding()
+    io_binding.bind_cpu_input('input_image', images)
+    pred_logits_shape = (1,100,92) 
+    pred_boxes_shape = (1,100,4)
+    pred_logits = torch.empty(pred_logits_shape, dtype=torch.float32, device='cuda:0').contiguous()
+    pred_boxes = torch.empty(pred_boxes_shape, dtype=torch.float32, device='cuda:0').contiguous()
+    io_binding.bind_output('pred_logits', element_type=numpy.float32, shape=pred_logits_shape, device_type='cuda', buffer_ptr=pred_logits.data_ptr())
+    io_binding.bind_output('pred_boxes', element_type=numpy.float32, shape=pred_boxes_shape, device_type='cuda', buffer_ptr=pred_boxes.data_ptr())
+    session.run_with_iobinding(io_binding)
+    pred_logits = torch.tensor(io_binding.copy_outputs_to_cpu()[0])
+    pred_boxes = torch.tensor(io_binding.copy_outputs_to_cpu()[1])
+    
+    results = dict(
+        pred_logits = pred_logits,
+        pred_boxes =  pred_boxes,
+    )
+    return results
+
+
 def inference(parameters):
     img_ids = parameters['img_ids']
     img_paths = parameters['img_paths']
@@ -197,7 +217,7 @@ def inference(parameters):
     tmp_total_dic = dict()
     all_results = list()
     a = time.perf_counter()
-    for batch_id, (img_path, img_id) in tqdm(enumerate(zip(img_paths, img_ids)), ascii=True, total=len(img_ids)):
+    for batch_id, (img_path, img_id) in tqdm(enumerate(zip(img_paths, img_ids), start=1), ascii=True, total=len(img_ids)):
         batch = [(img_path, img_id), ]
         images = list()
         image_sizes = list()
@@ -219,24 +239,7 @@ def inference(parameters):
 
         inference_start = time.perf_counter()
         preprocess_time = inference_start - a 
-        
-        io_binding = session.io_binding()
-        io_binding.bind_cpu_input('input_image', images)
-        pred_logits_shape = (1,100,92) 
-        pred_boxes_shape = (1,100,4)
-        pred_logits = torch.empty(pred_logits_shape, dtype=torch.float32, device='cuda:0').contiguous()
-        pred_boxes = torch.empty(pred_boxes_shape, dtype=torch.float32, device='cuda:0').contiguous()
-        io_binding.bind_output('pred_logits', element_type=numpy.float32, shape=pred_logits_shape, device_type='cuda', buffer_ptr=pred_logits.data_ptr())
-        io_binding.bind_output('pred_boxes', element_type=numpy.float32, shape=pred_boxes_shape, device_type='cuda', buffer_ptr=pred_boxes.data_ptr())
-        session.run_with_iobinding(io_binding)
-        pred_logits = torch.tensor(io_binding.copy_outputs_to_cpu()[0])
-        pred_boxes = torch.tensor(io_binding.copy_outputs_to_cpu()[1])
-        
-        results = dict(
-           pred_logits = pred_logits,
-           pred_boxes =  pred_boxes,
-        )
-
+        results = run_onnx(images, session)
         inference_end = time.perf_counter()
         inference_time = inference_end - inference_start
         tmp_inference_dic[batch_id] = float(inference_time)
@@ -296,7 +299,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     model_path = Path(args.model_path)
-    assert model_path.is_file(), f"Model Weights path {model_path.name} does not exist."
+    assert model_path.is_file(), f"Model Weights path {model_path.absolute()} does not exist."
 
     dataset_root = Path(args.dataset_path)
     assert dataset_root.is_dir(), f"provided COCO path {dataset_root} does not exist"
@@ -481,4 +484,3 @@ if __name__ == "__main__":
 
             
     
-

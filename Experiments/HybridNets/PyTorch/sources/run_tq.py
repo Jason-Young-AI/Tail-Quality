@@ -167,7 +167,7 @@ def inference(parameters):
     a = time.perf_counter()
 
     val_loader = tqdm(val_generator, ascii=True)
-    for batch_id, data in enumerate(val_loader):
+    for batch_id, data in enumerate(val_loader, start=1):
         imgs = data['img']
         annot = data['annot']
         seg_annot = data['segmentation']

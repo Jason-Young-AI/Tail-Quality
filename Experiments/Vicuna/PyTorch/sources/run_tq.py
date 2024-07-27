@@ -256,7 +256,7 @@ def inference(parameters):
 
         answers = []
         a = time.perf_counter()
-        for batch_id, batch_input in tqdm(enumerate(batch_split([record['prompt'] for record in records], batch_size))):
+        for batch_id, batch_input in tqdm(enumerate(batch_split([record['prompt'] for record in records], batch_size), start=1)):
             encode_inputs = prepare_input(tokenizer, batch_input)
             inference_start = time.perf_counter()
             preprocess_time = inference_start - a 

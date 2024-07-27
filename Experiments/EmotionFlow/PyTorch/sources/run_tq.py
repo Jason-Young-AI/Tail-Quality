@@ -353,7 +353,7 @@ def inference(model, dataloader):
     tmp_total_dic = dict()
     tq_test = tqdm(total=len(dataloader), desc="inference", position=0)
     a = time.perf_counter()
-    for batch_id, batch_data in enumerate(dataloader):
+    for batch_id, batch_data in enumerate(dataloader, start=1):
 
         batch_data = [x.to(model.device()) for x in batch_data]
         sentences = batch_data[0]

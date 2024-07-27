@@ -198,7 +198,7 @@ def inference(parameters):
     tmp_total_dic = dict()
     all_results = list()
     a = time.perf_counter()
-    for batch_id, (img_path, img_id) in tqdm(enumerate(zip(img_paths, img_ids)), ascii=True, total=len(img_ids)):
+    for batch_id, (img_path, img_id) in tqdm(enumerate(zip(img_paths, img_ids), start=1), ascii=True, total=len(img_ids)):
         batch = [(img_path, img_id), ]
         images = list()
         image_sizes = list()
