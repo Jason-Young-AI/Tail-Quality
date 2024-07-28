@@ -388,8 +388,8 @@ def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
     ax.set_ylabel('rJSD')
     ax.grid(True)
     ax.legend()
-    plt.savefig(results_basepath.joinpath("Light_GCN_Pytorch_rjsds.jpg"), format="jpg")
-    plt.savefig(results_basepath.joinpath("Light_GCN_Pytorch_rjsds.pdf"), format="pdf")
+    plt.savefig(results_basepath.joinpath("rJSDs.jpg"), format="jpg")
+    plt.savefig(results_basepath.joinpath("rJSDs.pdf"), format="pdf")
 
 
 if __name__ == "__main__":
@@ -422,7 +422,7 @@ if __name__ == "__main__":
                     help='Whether to plot confusion matrix when valing')
     parser.add_argument('--num_gpus', type=int, default=1,
                     help='Number of GPUs to be used (0 to use CPU)')
-    parser.add_argument('--conf_thres', type=float, default=0.001,
+    parser.add_argument('--conf_thres', type=float, default=0.5,
                     help='Confidence threshold in NMS')
     parser.add_argument('--iou_thres', type=float, default=0.6,
                     help='IoU threshold in NMS')
@@ -438,15 +438,15 @@ if __name__ == "__main__":
     fake_run = args.fake_run
     max_run = args.max_run
 
-    result_path = results_basepath.joinpath('Light_GCN_Pytorch.pickle')
-    rjsds_path = results_basepath.joinpath('Light_GCN_Pytorch_rjsds.pickle')
-    fit_distribution_dir = results_basepath.joinpath('distributions')
+    result_path = results_basepath.joinpath('All_Times.pickle')
+    rjsds_path = results_basepath.joinpath('All_rJSDs.pickle')
+    fit_distribution_dir = results_basepath.joinpath('All_PDFs')
     if not fit_distribution_dir.exists():
         fit_distribution_dir.mkdir(parents=True, exist_ok=True)
     fit_distribution_model_paths = list(fit_distribution_dir.iterdir())
     fit_distribution_number = len(fit_distribution_model_paths)//2
 
-    logger = set_logger(name='Light_GCN_Pytorch', mode='both', level='INFO', logging_filepath=results_basepath.joinpath('Light_GCN_Pytorch.log'))
+    logger = set_logger(name='Tail-Quality', mode='both', level='INFO', logging_filepath=results_basepath.joinpath('Tail-Quality.log'))
     total_batches = 0
     if result_path.exists():
         with open (result_path, 'rb') as f:
