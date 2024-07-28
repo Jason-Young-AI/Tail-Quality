@@ -618,7 +618,6 @@ if __name__ == "__main__":
                         del tmp_rjsds
                         logger.info(f'end_draw_rjsds')
 
-                
                     fit_distribution_number += 1
                     with open(fit_distribution_dir.joinpath(f'inference-{fit_distribution_number}.pickle'), 'wb') as f:
                         pickle.dump(fit_inference_distribution_model, f)
