@@ -35,7 +35,7 @@ class BddDataset(Dataset):
         self.Tensor = transforms.ToTensor()
         img_root = dataset_path.joinpath(params.dataset['datadir'])
         label_root = dataset_path.joinpath(params.dataset['labeldir'])
-        seg_root = dataset_path.joinpath(params.dataset['segdir'])
+        seg_root = params.dataset['segdir']
         self.seg_list = params.seg_list
         if is_train:
             indicator = params.dataset['train_set']
@@ -48,7 +48,7 @@ class BddDataset(Dataset):
             self.label_list = self.label_list[:50]
         self.seg_root = []
         for root in seg_root:
-            self.seg_root.append(Path(root) / indicator)
+            self.seg_root.append(dataset_path.joinpath(root) / indicator)
         self.albumentations_transform = A.Compose([
             A.Blur(p=0.01),
             A.MedianBlur(p=0.01),
