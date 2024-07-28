@@ -512,7 +512,7 @@ if __name__ == "__main__":
     with torch.no_grad():
         while not sucess_flag:
             loop += 1 # for debugging
-            params = {
+            this_params = {
                 'dataset': val_generator,
                 'hybridnets': model,
                 'fake_run': fake_run,
@@ -526,7 +526,7 @@ if __name__ == "__main__":
             logger.info(f'warm_run: {warm_run}')
             logger.info(f'fit_distribution_number: {fit_distribution_number}')
             
-            tmp_inference_dic, tmp_total_dic = inference(params)
+            tmp_inference_dic, tmp_total_dic = inference(this_params)
             logger.info(f'after inference')
             if not fake_run:
                 already_run += 1 
