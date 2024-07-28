@@ -9,10 +9,10 @@ cd ./sources
 python run_tq.py \
   --min-run 100 \
   --results-basepath ${THIS_RESULTS_DIR} \
-  --warm-run 1 \
+  --warm-run 5 \
   --window-size 5 \
   --fit-run-number 2 \
-  --rJSD-threshold 0.005 \
+  --rJSD-threshold 0.02 \
   --max-run 1000000 \
   --dataset-path ${THIS_DATASET_DIR} \
   --model-path ${THIS_MODEL_DIR}/${THIS_MODEL_FILENAME}

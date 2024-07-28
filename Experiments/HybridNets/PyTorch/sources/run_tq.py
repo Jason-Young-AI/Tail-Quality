@@ -367,9 +367,9 @@ def inference(parameters):
             confusion_matrix.plot(save_dir=save_dir, names=list(names.values()))
             confusion_matrix.tp_fp()
 
-        results = (mp, mr, map50, map, iou_score, acc_score, loss)
+        results = (float(mp), float(mr), float(map50), float(map), float(iou_score), float(acc_score), float(loss))
 
-        with open(results_basepath.joinpath('HybridNets_Pytorch_origin_quality.json'), 'w') as f:
+        with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
             json.dump(results, f, indent=2)
 
     return  tmp_inference_dic, tmp_total_dic
