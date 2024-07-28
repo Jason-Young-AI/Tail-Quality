@@ -28,4 +28,4 @@ source $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
 mkdir -p $CONDA_PREFIX/lib/nvvm/libdevice
 cp $CONDA_PREFIX/lib/libdevice.10.bc $CONDA_PREFIX/lib/nvvm/libdevice/
 
-pip install scikit-learn matplotlib --no-input
+pip install scikit-learn matplotlib KDEpy --no-input
