@@ -477,7 +477,7 @@ if __name__ == "__main__":
             )
         ]),
         seg_mode=seg_mode,
-        dataset_path=args.dataset_path
+        dataset_path=pathlib.Path(args.dataset_path)
     )
 
     val_generator = DataLoaderX(
