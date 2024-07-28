@@ -476,7 +476,8 @@ if __name__ == "__main__":
                 mean=params.mean, std=params.std
             )
         ]),
-        seg_mode=seg_mode
+        seg_mode=seg_mode,
+        dataset_path=args.dataset_path
     )
 
     val_generator = DataLoaderX(
