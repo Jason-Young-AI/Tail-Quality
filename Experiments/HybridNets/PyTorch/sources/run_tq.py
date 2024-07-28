@@ -567,7 +567,7 @@ if __name__ == "__main__":
 
                 logger.info(f'(already_run - warm_run) % fit_run_number == {(already_run - warm_run) % fit_run_number}') 
                 logger.info(f"fit_distribution_number % window_size == {fit_distribution_number % window_size}")
-                if (already_run - warm_run) % fit_run_number == 0 and already_run != warm_run:
+                if already_run > warm_run and (already_run - warm_run) % fit_run_number == 0:
                     fit_inference_distribution_model = fit(all_inference_times) 
                     fit_total_distribution_model = fit(all_total_times)
                     if fit_distribution_number % window_size == 0 and fit_distribution_number != 0:
