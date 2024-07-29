@@ -8,7 +8,7 @@ cd ./sources/code
 
 python run_tq.py \
   --results-basepath ${THIS_RESULTS_DIR} \
-  --warm-run 1 \
+  --warm-run 5 \
   --window-size 5 \
   --fit-run-number 2 \
   --rJSD-threshold 0.02 \
