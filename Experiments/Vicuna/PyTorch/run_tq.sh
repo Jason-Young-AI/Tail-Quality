@@ -9,10 +9,10 @@ cd ./sources
 HF_HOME=${THIS_MODEL_DIR} python run_tq.py \
   --min-run 100 \
   --results-basepath ${THIS_RESULTS_DIR} \
-  --warm-run 1 \
+  --warm-run 2 \
   --window-size 5 \
-  --fit-run-number 2 \
-  --rJSD-threshold 0.005 \
+  --fit-run-number 1 \
+  --rJSD-threshold 0.02 \
   --max-run 1000000 \
   --batch-size 1 \
   --dataset-path ${THIS_DATASET_DIR} \

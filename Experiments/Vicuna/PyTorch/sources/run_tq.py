@@ -290,6 +290,7 @@ def inference(parameters):
             question_numbers = [record['question_number'] for record in records]
             main_results[task] = {'pred_answers': answers, 'gold_answers': gold_answers, 'token_lengths': token_lengths, 'question_numbers': question_numbers}
 
+    logger.info(f'TT={(time.perf_counter() - total_inference_time_start):.2f}s')
     if fake_run:
         with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
             json.dump(main_results, f, indent=2)
