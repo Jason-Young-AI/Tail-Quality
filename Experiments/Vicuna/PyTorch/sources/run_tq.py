@@ -232,10 +232,11 @@ def inference(parameters):
     number_train = parameters['number_train']
     results_basepath = parameters['results_basepath']
 
+    total_tasks = len(tasks)
     tmp_inference_dic = dict()
     tmp_total_dic = dict()
     main_results = dict()
-    for task, (dev_path, subset_path) in zip(tasks, data_paths):
+    for task_id, (task, (dev_path, subset_path)) in enumerate(zip(tasks, data_paths)):
         print(f' - Testing {task} ...')
         records = []
         dev_data_frame = pd.read_csv(dev_path, header=None)[:number_train]
@@ -258,7 +259,8 @@ def inference(parameters):
 
         answers = []
         a = time.perf_counter()
-        for batch_id, batch_input in tqdm(enumerate(batch_split([record['prompt'] for record in records], batch_size), start=1)):
+        batches = batch_split([record['prompt'] for record in records], batch_size)
+        for batch_id, batch_input in tqdm(enumerate(batches, start=1), total=len(batches), desc=f'No. {task_id}/{total_tasks}'):
             encode_inputs = prepare_input(tokenizer, batch_input)
             inference_start = time.perf_counter()
             preprocess_time = inference_start - a 
