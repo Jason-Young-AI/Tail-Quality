@@ -16,5 +16,6 @@ python run_tq.py \
   --max-run 1000000 \
   --dataset-path ${THIS_DATASET_DIR} \
   --model-path ${THIS_MODEL_DIR}/${THIS_MODEL_FILENAME}
+  # --cpu \
 
 cd ..

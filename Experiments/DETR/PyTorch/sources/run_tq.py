@@ -195,6 +195,7 @@ def inference(parameters):
     detr = parameters['detr']
     fake_run = parameters['fake_run']
     results_basepath = parameters['results_basepath']
+    cpu = parameters['cpu']
     assert len(img_paths) == len(img_ids), "Fatal Error!"
 
     tmp_inference_dic = dict()
@@ -218,8 +219,12 @@ def inference(parameters):
             image_sizes.append(torch.as_tensor([int(h), int(w)]))
             image_indices.append(img_id)
 
-        images = nested_tensor_from_tensor_list(images).to('cuda:0')
-        image_sizes = torch.stack(image_sizes, dim=0).to('cuda:0')
+        if cpu:
+            images = nested_tensor_from_tensor_list(images)
+            image_sizes = torch.stack(image_sizes, dim=0)
+        else:
+            images = nested_tensor_from_tensor_list(images).to('cuda:0')
+            image_sizes = torch.stack(image_sizes, dim=0).to('cuda:0')
 
         inference_start = time.perf_counter()
         preprocess_time = inference_start - a 
@@ -296,6 +301,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--dataset-path', type=str, required=True)
     parser.add_argument('--model-path', type=str, required=True)
+    parser.add_argument('--cpu', action='store_true')
 
     args = parser.parse_args()
 
@@ -342,7 +348,10 @@ if __name__ == "__main__":
     detr = DETR()
     state_dict = torch.load(args.model_path)
     detr.load_state_dict(state_dict, strict=True)
-    detr.to('cuda:0')
+    if args.cpu:
+        detr.to('cpu')
+    else:
+        detr.to('cuda:0')
     detr.eval()
 
     # [!End] Model Initialization
@@ -358,6 +367,7 @@ if __name__ == "__main__":
                 'detr': detr,
                 'fake_run': fake_run,
                 'results_basepath': results_basepath,
+                'cpu': args.cpu,
             }
 
             logger.info(f'-------before loop {loop}-------')
