@@ -11,7 +11,6 @@ export XDG_CACHE_HOME=/younger/peng/Tail-Quality/Experiments/MobileNet/Pytorch/m
 python run_tq.py \
   --results-basepath ${THIS_RESULTS_DIR} \
   --warm-run 1 \
-  --gpu 0 \
   --window-size 5 \
   --fit-run-number 2 \
   --batch-size 100 \

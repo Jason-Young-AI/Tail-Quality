@@ -143,6 +143,7 @@ def inference(parameters):
 
     top1 = list()
     top5 = list()
+    pred_labels = list()
     loader = tqdm(val_loader, ascii=True)
 
     a = time.perf_counter()
@@ -157,30 +158,42 @@ def inference(parameters):
         inference_end = time.perf_counter()
         inference_time = inference_end - inference_start
         tmp_inference_dic[batch_id] = float(inference_time)
+
         postprocess_start = time.perf_counter()
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        top1.append(acc1[0])
-        top5.append(acc5[0])
+        pred = postprocess(output)
+        pred_labels.append(pred)
         postprocess_end = time.perf_counter()
+
         postprocess_time = postprocess_end - postprocess_start
         total_time = preprocess_time + inference_time + postprocess_time
         tmp_total_dic[batch_id] = float(total_time)
+        if fake_run:
+            acc1, acc5 = accuracy(pred, target, topk=(1, 5))
+            top1.append(acc1[0])
+            top5.append(acc5[0])
+
         a = time.perf_counter()
+
     if fake_run:
+        print('top1[0]', top1[0]) # debugging: to check whether the tensor on GPU or not
         avg_top1 = sum(top1)/len(top1)
         avg_top5 = sum(top5)/len(top5)
-        print(avg_top1, avg_top5) # full: tensor(71.8500, device='cuda:0') tensor(90.3340, device='cuda:0')
-                                  # subset: tensor(72.4200, device='cuda:0') tensor(90.4400, device='cuda:0')
-
+        print('avg_top1, avg_top5: ', avg_top1, avg_top5) 
+                                 
     return tmp_inference_dic, tmp_total_dic
 
 
-def accuracy(output, target, topk=(1,)):
-    """Computes the accuracy over the k top predictions for the specified values of k"""
+def postprocess(output, topk=(1, 5)):
     with torch.no_grad():
         maxk = max(topk)
-        batch_size = target.size(0)
         _, pred = output.topk(maxk, 1, True, True)
+    return pred
+
+
+def accuracy(pred, target, topk=(1,)):
+    """Computes the accuracy over the k top predictions for the specified values of k"""
+    with torch.no_grad():
+        batch_size = target.size(0)
         pred = pred.t()
         correct = pred.eq(target.view(1, -1).expand_as(pred))
         res = []
@@ -229,7 +242,7 @@ if __name__ == '__main__':
                             'using Data Parallel or Distributed Data Parallel')
     parser.add_argument('--world-size', default=-1, type=int,
                         help='number of nodes for distributed training')
-    parser.add_argument('--gpu', default=0, type=int,
+    parser.add_argument('--gpu', default=None, type=int,
                         help='GPU id to use.')
 
     parser.add_argument('--min-run', type=int, required=False)
@@ -421,6 +434,7 @@ if __name__ == '__main__':
                     
                 with open(result_path, 'wb') as f:
                     pickle.dump(tmp_results, f)
+                    logger.info(f'len tmp_results["inference"] is {len(tmp_results["inference"])}')
                 del tmp_results
                 del all_total_times
                 del all_inference_times

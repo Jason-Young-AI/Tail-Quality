@@ -144,7 +144,7 @@ def inference(parameters):
     acc_top5 = mx.metric.TopKAccuracy(5)
     acc_top1.reset()
     acc_top5.reset()    
-
+    pred_labels= list()
     Batch = namedtuple('Batch', ['data'])
     val_data = tqdm(val_data, ascii=True)
     a = time.perf_counter()
@@ -161,21 +161,36 @@ def inference(parameters):
         tmp_inference_dic[batch_id] = float(inference_time)
         postprocess_start = time.perf_counter()
         outputs=mod.get_outputs()
-        acc_top1.update(label, outputs)
-        acc_top5.update(label, outputs)
+        pred_label = postprocess(label, outputs)
+        pred_labels.append(pred_label)
         postprocess_end = time.perf_counter()
         postprocess_time =  postprocess_end - postprocess_start
-
         total_time = preprocess_time + inference_time + postprocess_time
         tmp_total_dic[batch_id] = float(total_time)
+        if fake_run:
+            acc_top1.update(label, outputs)
+            acc_top5.update(label, outputs)
         a = time.perf_counter()
-        
+
     if fake_run:
         _, top1 = acc_top1.get()
         _, top5 = acc_top5.get()
         print("in fake run: Top-1 accuracy: {}, Top-5 accuracy: {}".format(top1, top5))
 
     return  tmp_inference_dic, tmp_total_dic
+
+
+def postprocess(labels, preds):
+    pred_label_list = list()
+    for label, pred_label in zip(labels, preds):
+        if pred_label.shape != label.shape:
+            pred_label = numpy.argmax(pred_label, axis=1)
+        pred_label = pred_label.asnumpy().astype('int32')
+        pred_label_list.append(pred_label)
+
+    return pred_label_list
+            
+            
 
 
 def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
@@ -218,7 +233,8 @@ if __name__ == "__main__":
     assert dataset_root.is_dir(), f"provided Imagenet path {dataset_root} does not exist"
     if args.device == 'gpu':
         ctx = [mx.gpu(0)]
-        
+    else:
+        ctx = [mx.cpu()]    
     batch_size = args.batch_size
     sym, arg_params, aux_params = import_model(model_path)
     num_workers = 8
@@ -381,6 +397,7 @@ if __name__ == "__main__":
                     
                 with open(result_path, 'wb') as f:
                     pickle.dump(tmp_results, f)
+                    logger.info(f'len tmp_results["inference"] is {len(tmp_results["inference"])}')
                 del tmp_results
                 del all_total_times
                 del all_inference_times
