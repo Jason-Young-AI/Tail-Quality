@@ -191,7 +191,7 @@ def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
     inference_data = list(range(1, len(rjsds['inference']) + 1))
     total_data = list(range(1, len(rjsds['total']) + 1))
     fig, ax = plt.subplots()
-    
+
     ax.plot(inference_data, rjsds['inference'], marker='o', linestyle='-', color='b', label='rJSD(inference time)')
     ax.plot(total_data, rjsds['total'], marker='o', linestyle='-', color='y', label='rJSD(total time)')
     ax.set_title('rJSD Fitting Progress')
