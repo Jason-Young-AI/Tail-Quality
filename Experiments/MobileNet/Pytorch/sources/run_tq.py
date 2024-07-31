@@ -252,7 +252,7 @@ if __name__ == '__main__':
     max_run = args.max_run
 
     dataset_root = Path(args.dataset_path)
-    assert dataset_root.is_dir(), f"provided COCO path {dataset_root.absolute()} does not exist"
+    assert dataset_root.is_dir(), f"provided Imagenet path {dataset_root.absolute()} does not exist"
 
     result_path = results_basepath.joinpath('All_Times.pickle')
     rjsds_path = results_basepath.joinpath('All_rJSDs.pickle')
