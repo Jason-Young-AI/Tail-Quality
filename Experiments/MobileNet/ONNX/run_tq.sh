@@ -6,16 +6,18 @@ source $CONDA_PREFIX/bin/activate ${THIS_ENV_NAME}
 
 cd ./sources
 
+mkdir -p ${THIS_RESULTS_DIR}/GPU
+
 python run_tq.py \
-  --results-basepath ${THIS_RESULTS_DIR} \
-  --warm-run 1 \
+  --results-basepath ${THIS_RESULTS_DIR}/GPU \
+  --warm-run 30 \
   --device gpu \
   --window-size 5 \
-  --fit-run-number 2 \
+  --fit-run-number 6 \
   --batch-size 100 \
-  --rJSD-threshold 0.005 \
+  --rJSD-threshold 0.02 \
   --max-run 1000000 \
   --dataset-path ${THIS_DATASET_DIR} \
-  --model-path /younger/peng/Tail-Quality/Experiments/MobileNet/ONNX/model/mobilenetv2-7.onnx
+  --model-path ${THIS_MODEL_DIR}/${THIS_MODEL_FILENAME}
 
 cd ..

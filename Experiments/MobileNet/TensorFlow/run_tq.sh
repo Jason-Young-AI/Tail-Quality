@@ -6,8 +6,10 @@ source $CONDA_PREFIX/bin/activate ${THIS_ENV_NAME}
 
 cd ./sources
 
+mkdir -p ${THIS_RESULTS_DIR}/GPU
+
 python run_tq.py \
-  --results-basepath ${THIS_RESULTS_DIR} \
+  --results-basepath ${THIS_RESULTS_DIR}/GPU \
   --warm-run 30 \
   --window-size 5 \
   --fit-run-number 6 \
