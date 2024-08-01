@@ -9,6 +9,7 @@ from mxnet.contrib.onnx.onnx2mx.import_model import import_model
 import os
 import sys
 import time
+import json
 import torch
 import numpy
 import pickle
@@ -138,59 +139,75 @@ def inference(parameters):
     mod = parameters['mod']
     fake_run = parameters['fake_run']
     results_basepath = parameters['results_basepath']
+    batch_size = parameters['batch_size']
+    ctx = parameters['ctx']
     tmp_inference_dic = dict()
-    tmp_total_dic = dict()
-    acc_top1 = mx.metric.Accuracy()
-    acc_top5 = mx.metric.TopKAccuracy(5)
-    acc_top1.reset()
-    acc_top5.reset()    
-    pred_labels= list()
+    tmp_total_dic = dict() 
+    
+    predicted_label_top1_list = list()
+    predicted_label_top5_list = list()
+    labels_list = list()
+    if fake_run:
+        origin_quality = dict(
+            top1_acc = dict(),
+            top5_acc = dict(),
+        )
     Batch = namedtuple('Batch', ['data'])
     val_data = tqdm(val_data, ascii=True)
+
     a = time.perf_counter()
     for batch_id, batch in enumerate(val_data, start=1):
-        
-        data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0)
-        label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0)
+        datas = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0)
+        labels = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0)
         
         inference_start = time.perf_counter()
         preprocess_time = inference_start - a 
-        mod.forward(Batch([data[0]]))
+        mod.forward(Batch([datas[0]]))
         inference_end = time.perf_counter()
         inference_time = inference_end - inference_start
         tmp_inference_dic[batch_id] = float(inference_time)
+        
         postprocess_start = time.perf_counter()
         outputs=mod.get_outputs()
-        pred_label = postprocess(label, outputs)
-        pred_labels.append(pred_label)
+        for output in outputs[0]:
+            predicted_label_top1_list.append(mx.nd.argmax(output))
+            predicted_label_top5_list.append(mx.nd.topk(output, k=5))
         postprocess_end = time.perf_counter()
         postprocess_time =  postprocess_end - postprocess_start
         total_time = preprocess_time + inference_time + postprocess_time
         tmp_total_dic[batch_id] = float(total_time)
+
         if fake_run:
-            acc_top1.update(label, outputs)
-            acc_top5.update(label, outputs)
+            for label in labels[0]:
+                labels_list.append(label)
+            batch_acc1, batch_acc5 = accuracy(predicted_label_top5_list[-batch_size:], labels_list[-batch_size:])
+            origin_quality['top1_acc'][batch_id] = batch_acc1 
+            origin_quality['top5_acc'][batch_id] = batch_acc5 
+    
         a = time.perf_counter()
 
     if fake_run:
-        _, top1 = acc_top1.get()
-        _, top5 = acc_top5.get()
-        print("in fake run: Top-1 accuracy: {}, Top-5 accuracy: {}".format(top1, top5))
+        acc1, acc5 = accuracy(predicted_label_top5_list, labels_list)
+        print('top1-acc and top5-acc : ',acc1, acc5) # acc in the whole val set
+        with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
+            json.dump(origin_quality, f, indent=2)
+                                 
+    return tmp_inference_dic, tmp_total_dic
 
-    return  tmp_inference_dic, tmp_total_dic
 
-
-def postprocess(labels, preds):
-    pred_label_list = list()
-    for label, pred_label in zip(labels, preds):
-        if pred_label.shape != label.shape:
-            pred_label = numpy.argmax(pred_label, axis=1)
-        pred_label = pred_label.asnumpy().astype('int32')
-        pred_label_list.append(pred_label)
-
-    return pred_label_list
-            
-            
+def accuracy(predicted_label_top5_list, labels):
+    """Computes the accuracy over the k top predictions for the specified values of k"""
+    with torch.no_grad():
+        top1_acc = 0
+        top5_acc =0
+        for i, (predicted_label_top5, label) in enumerate(zip(predicted_label_top5_list, labels)):
+            if predicted_label_top5[0] == label.astype(predicted_label_top5[0].dtype):
+                top1_acc += 1
+            if label.astype(predicted_label_top5[0].dtype) in predicted_label_top5:
+                top5_acc += 1
+        top1_acc = "{:6.2f}".format(100*(top1_acc/len(labels)))
+        top5_acc = "{:6.2f}".format(100*(top5_acc/len(labels)))
+        return top1_acc,top5_acc
 
 
 def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
@@ -281,7 +298,6 @@ if __name__ == "__main__":
         del results
     else:
         already_run = 0
-
      
     sucess_flag = False
     loop = 0 # for debugging
@@ -293,6 +309,8 @@ if __name__ == "__main__":
                 'mod': mod, 
                 'fake_run': fake_run,
                 'results_basepath': results_basepath,
+                'batch_size': batch_size,
+                'ctx': ctx,
             }
 
             logger.info(f'-------before loop {loop}-------')

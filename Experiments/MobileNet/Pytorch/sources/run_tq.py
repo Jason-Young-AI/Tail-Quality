@@ -1,7 +1,10 @@
+from cgi import parse_multipart
+import enum
 import os
 import sys
 import time
 import numpy
+import json
 import pickle
 import pathlib
 import logging
@@ -138,69 +141,73 @@ def inference(parameters):
     fake_run = parameters['fake_run']
     results_basepath = parameters['results_basepath']
     gpu = parameters['gpu']
+    batch_size = parameters['batch_size']
     tmp_inference_dic = dict()
     tmp_total_dic = dict()
 
-    top1 = list()
-    top5 = list()
-    pred_labels = list()
+    predicted_label_top1_list = list()
+    predicted_label_top5_list = list()
+    targets_list = list()
+    if fake_run:
+        origin_quality = dict(
+            top1_acc = dict(),
+            top5_acc = dict(),
+        )
     loader = tqdm(val_loader, ascii=True)
 
     a = time.perf_counter()
-    for batch_id, (images, target) in enumerate(loader, start=1):
+    for batch_id, (images, targets) in enumerate(loader, start=1):
         if gpu is not None and torch.cuda.is_available():
             images = images.cuda(args.gpu, non_blocking=True)
-            target = target.cuda(args.gpu, non_blocking=True)
+            targets = targets.cuda(args.gpu, non_blocking=True)
 
         inference_start = time.perf_counter()
         preprocess_time = inference_start - a
-        output = model(images)
+        outputs = model(images)
         inference_end = time.perf_counter()
         inference_time = inference_end - inference_start
         tmp_inference_dic[batch_id] = float(inference_time)
 
         postprocess_start = time.perf_counter()
-        pred = postprocess(output)
-        pred_labels.append(pred)
+        for output in outputs:
+            predicted_label_top1_list.append(torch.argmax(output))
+            predicted_label_top5_list.append(torch.topk(output, k=5).indices)
         postprocess_end = time.perf_counter()
-
         postprocess_time = postprocess_end - postprocess_start
         total_time = preprocess_time + inference_time + postprocess_time
         tmp_total_dic[batch_id] = float(total_time)
+
         if fake_run:
-            acc1, acc5 = accuracy(pred, target, topk=(1, 5))
-            top1.append(acc1[0])
-            top5.append(acc5[0])
+            for target in targets:
+                targets_list.append(target)
+            batch_acc1, batch_acc5 = accuracy(predicted_label_top5_list[-batch_size:], targets[-batch_size:])
+            origin_quality['top1_acc'][batch_id] = batch_acc1 
+            origin_quality['top5_acc'][batch_id] = batch_acc5 
 
         a = time.perf_counter()
-
+   
     if fake_run:
-        print('top1[0]', top1[0]) # debugging: to check whether the tensor on GPU or not
-        avg_top1 = sum(top1)/len(top1)
-        avg_top5 = sum(top5)/len(top5)
-        print('avg_top1, avg_top5: ', avg_top1, avg_top5) 
+        acc1, acc5 = accuracy(predicted_label_top5_list, targets_list)
+        print('top1-acc and top5-acc : ',acc1, acc5) # acc in the whole val set
+        with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
+            json.dump(origin_quality, f, indent=2)
                                  
     return tmp_inference_dic, tmp_total_dic
 
 
-def postprocess(output, topk=(1, 5)):
-    with torch.no_grad():
-        maxk = max(topk)
-        _, pred = output.topk(maxk, 1, True, True)
-    return pred
-
-
-def accuracy(pred, target, topk=(1,)):
+def accuracy(predicted_label_top5_list, targets):
     """Computes the accuracy over the k top predictions for the specified values of k"""
     with torch.no_grad():
-        batch_size = target.size(0)
-        pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-        res = []
-        for k in topk:
-            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
-        return res
+        top1_acc = 0
+        top5_acc =0
+        for i, (predicted_label_top5, target) in enumerate(zip(predicted_label_top5_list, targets)):
+            if predicted_label_top5[0] == target:
+                top1_acc += 1
+            if target in predicted_label_top5:
+                top5_acc += 1
+        top1_acc = "{:6.2f}".format(100*(top1_acc/len(targets)))
+        top5_acc = "{:6.2f}".format(100*(top5_acc/len(targets)))
+        return top1_acc,top5_acc
 
 
 def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
@@ -330,6 +337,7 @@ if __name__ == '__main__':
                 'fake_run': fake_run,
                 'results_basepath': results_basepath,
                 'gpu': args.gpu,
+                'batch_size': args.batch_size,
             }
 
             logger.info(f'-------before loop {loop}-------')
