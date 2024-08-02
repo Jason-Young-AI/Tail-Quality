@@ -6,7 +6,7 @@ source $CONDA_PREFIX/bin/activate ${THIS_ENV_NAME}
 
 cd ./sources
 
-export XDG_CACHE_HOME=/younger/peng/Tail-Quality/Experiments/MobileNet/Pytorch/model
+export XDG_CACHE_HOME=${THIS_MODEL_DIR}
 
 mkdir -p ${THIS_RESULTS_DIR}/CPU
 
