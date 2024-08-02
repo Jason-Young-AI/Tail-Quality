@@ -216,6 +216,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch-size', type=int, required=True)
     parser.add_argument('--dataset-path', type=str, required=True)
     parser.add_argument('--model-path', type=str, required=True)
+    parser.add_argument('--workers', default=8, type=int)
 
     args = parser.parse_args()
 
@@ -241,7 +242,8 @@ if __name__ == "__main__":
     label_ds = tf.data.Dataset.from_tensor_slices(tf.cast(label_ids, tf.int64))
 
     instance_ds = tf.data.Dataset.zip((image_ds, label_ds))
-    instance_ds = instance_ds.map(transform, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    #instance_ds = instance_ds.map(transform, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    instance_ds = instance_ds.map(transform, num_parallel_calls=args.workers)
     instance_ds = instance_ds.batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
     instance_it = tf.compat.v1.data.make_initializable_iterator(instance_ds)
     next_batch = instance_it.get_next()

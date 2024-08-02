@@ -11,7 +11,7 @@ THIS_MODEL_FILENAME=mobilenetv2-7.onnx
 
 THIS_MODEL_NAME=MobileNet
 
-THIS_FRAMEWORK=Pytorch
+THIS_FRAMEWORK=PyTorch
 
 TQ_ASSETS_ROOT=$(get_absolute_path "../../../../TQAssets")
 
