@@ -10,7 +10,7 @@ export XDG_CACHE_HOME=${THIS_MODEL_DIR}
 
 mkdir -p ${THIS_RESULTS_DIR}/CPU
 
-python run_tq.py \
+CUDA_VISIBLE_DEVICES="" python run_tq.py \
   --results-basepath ${THIS_RESULTS_DIR}/CPU \
   --warm-run 30 \
   --window-size 5 \
@@ -18,6 +18,6 @@ python run_tq.py \
   --batch-size 100 \
   --rJSD-threshold 0.02 \
   --max-run 1000000 \
-  --dataset-path ${THIS_DATASET_DIR} 
+  --dataset-path ${THIS_DATASET_DIR}
 
 cd ..
