@@ -8,7 +8,7 @@ cd ./sources
 
 mkdir -p ${THIS_RESULTS_DIR}/CPU
 
-python run_tq.py \
+CUDA_VISIBLE_DEVICES="" python run_tq.py \
   --results-basepath ${THIS_RESULTS_DIR}/CPU \
   --warm-run 30 \
   --device cpu \
