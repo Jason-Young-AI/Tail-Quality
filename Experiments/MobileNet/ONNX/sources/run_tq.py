@@ -1,6 +1,7 @@
 import mxnet as mx
 import numpy as np
 from mxnet import gluon, nd
+from mxnet import profiler
 from mxnet.gluon.data.vision import transforms
 from gluoncv.data import imagenet
 from collections import namedtuple
@@ -143,6 +144,7 @@ def inference(parameters):
     Batch = namedtuple('Batch', ['data'])
     val_data = tqdm(val_data, ascii=True)
 
+    # profiler.set_state('run')
     a = time.perf_counter()
     for batch_id, batch in enumerate(val_data, start=1):
         datas = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0)
@@ -150,38 +152,35 @@ def inference(parameters):
         
         inference_start = time.perf_counter()
         preprocess_time = inference_start - a 
-        print('preprocess_time: ', preprocess_time)
         mod.forward(Batch([datas[0]]))
+        outputs=mod.get_outputs()
         inference_end = time.perf_counter()
         inference_time = inference_end - inference_start
-        print('inference_time:', inference_time)
         tmp_inference_dic[batch_id] = float(inference_time)
+
         postprocess_start = time.perf_counter()
-        outputs=mod.get_outputs()
-        # print('get_ouputs_time: ', time.perf_counter() - postprocess_start)
-        # for_start = time.perf_counter()
-        # fake1 = mx.nd.argmax(outputs[0][0]).asnumpy() 
-        # fake2 = mx.nd.topk(outputs[0][0], k=5).asnumpy()
         b = time.perf_counter()
         for i, output in enumerate(outputs[0]):
             if i == 0:
                 c = time.perf_counter()
+                # mx.nd.waitall()
+                # profiler.set_state('stop') 
                 fake1 = mx.nd.argmax(output).asnumpy() 
-                fake2 = mx.nd.topk(output).asnumpy()  
+                fake2 = mx.nd.topk(output).asnumpy()
+                # profiler.set_state('run')  
                 postprocess_start = time.perf_counter() + c - b  
-            # add_time_start = time.perf_counter()
             predicted_label_top1_list.append(mx.nd.argmax(output).asnumpy())
             predicted_label_top5_list.append(mx.nd.topk(output, k=5).asnumpy())
-            # add_time_end = time.perf_counter()
-            # print('add_time:', add_time_end - add_time_start)
-        # for_end = time.perf_counter()
-        # print('for_time: ',for_end - for_start )
+
         postprocess_end = time.perf_counter()
         postprocess_time =  postprocess_end - postprocess_start
-        print('postprocess_time: ', postprocess_time)
+
         total_time = preprocess_time + inference_time + postprocess_time
-        print('total_time: ', total_time)
         tmp_total_dic[batch_id] = float(total_time)
+        # print('preprocess_time', preprocess_time)
+        # print('inference_time', inference_time)
+        # print('postprocess_time', postprocess_time)
+        # print('total_time', total_time)
 
         if fake_run:
             for label in labels[0]:
@@ -192,7 +191,8 @@ def inference(parameters):
         del outputs
         del datas
         del labels
-        
+        # mx.nd.waitall()
+        # profiler.set_state('stop') 
         a = time.perf_counter()
 
     if fake_run:
@@ -328,7 +328,16 @@ if __name__ == "__main__":
         logger.info(f'warm_run: {warm_run}')
         logger.info(f'fit_distribution_number: {fit_distribution_number}')
 
+        # if not fake_run:
+        #     profiler.set_config(profile_all=True, aggregate_stats=True, filename='profile_output.json')
+        
         tmp_inference_dic, tmp_total_dic = inference(params)
+
+        # if not fake_run:
+        #     mx.nd.waitall()
+        #     profiler.set_state('stop')
+        #     logger.info(profiler.dumps())
+
         logger.info(f'after inference')
         if not fake_run:
             already_run += 1 
