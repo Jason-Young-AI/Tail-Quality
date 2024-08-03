@@ -150,18 +150,37 @@ def inference(parameters):
         
         inference_start = time.perf_counter()
         preprocess_time = inference_start - a 
+        print('preprocess_time: ', preprocess_time)
         mod.forward(Batch([datas[0]]))
         inference_end = time.perf_counter()
         inference_time = inference_end - inference_start
+        print('inference_time:', inference_time)
         tmp_inference_dic[batch_id] = float(inference_time)
         postprocess_start = time.perf_counter()
         outputs=mod.get_outputs()
-        for output in outputs[0]:
+        # print('get_ouputs_time: ', time.perf_counter() - postprocess_start)
+        # for_start = time.perf_counter()
+        # fake1 = mx.nd.argmax(outputs[0][0]).asnumpy() 
+        # fake2 = mx.nd.topk(outputs[0][0], k=5).asnumpy()
+        b = time.perf_counter()
+        for i, output in enumerate(outputs[0]):
+            if i == 0:
+                c = time.perf_counter()
+                fake1 = mx.nd.argmax(output).asnumpy() 
+                fake2 = mx.nd.topk(output).asnumpy()  
+                postprocess_start = time.perf_counter() + c - b  
+            # add_time_start = time.perf_counter()
             predicted_label_top1_list.append(mx.nd.argmax(output).asnumpy())
             predicted_label_top5_list.append(mx.nd.topk(output, k=5).asnumpy())
+            # add_time_end = time.perf_counter()
+            # print('add_time:', add_time_end - add_time_start)
+        # for_end = time.perf_counter()
+        # print('for_time: ',for_end - for_start )
         postprocess_end = time.perf_counter()
         postprocess_time =  postprocess_end - postprocess_start
+        print('postprocess_time: ', postprocess_time)
         total_time = preprocess_time + inference_time + postprocess_time
+        print('total_time: ', total_time)
         tmp_total_dic[batch_id] = float(total_time)
 
         if fake_run:
@@ -407,6 +426,8 @@ if __name__ == "__main__":
             with open(result_path, 'wb') as f:
                 pickle.dump(tmp_results, f)
                 logger.info(f'len tmp_results["inference"] is {len(tmp_results["inference"])}')
+            with open(f'{result_path}.json', 'w') as f:
+                json.dump(tmp_results, f, indent=2) 
             del tmp_results
             del all_total_times
             del all_inference_times
