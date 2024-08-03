@@ -7,6 +7,7 @@ from collections import namedtuple
 from mxnet.contrib.onnx.onnx2mx.import_model import import_model
 
 import os
+import gc
 import sys
 import time
 import json
@@ -153,12 +154,11 @@ def inference(parameters):
         inference_end = time.perf_counter()
         inference_time = inference_end - inference_start
         tmp_inference_dic[batch_id] = float(inference_time)
-        
         postprocess_start = time.perf_counter()
         outputs=mod.get_outputs()
         for output in outputs[0]:
-            predicted_label_top1_list.append(mx.nd.argmax(output))
-            predicted_label_top5_list.append(mx.nd.topk(output, k=5))
+            predicted_label_top1_list.append(mx.nd.argmax(output).asnumpy())
+            predicted_label_top5_list.append(mx.nd.topk(output, k=5).asnumpy())
         postprocess_end = time.perf_counter()
         postprocess_time =  postprocess_end - postprocess_start
         total_time = preprocess_time + inference_time + postprocess_time
@@ -170,15 +170,22 @@ def inference(parameters):
             batch_acc1, batch_acc5 = accuracy(predicted_label_top5_list[-batch_size:], labels_list[-batch_size:])
             origin_quality['top1_acc'][batch_id] = batch_acc1 
             origin_quality['top5_acc'][batch_id] = batch_acc5 
-    
+        del outputs
+        del datas
+        del labels
+        
         a = time.perf_counter()
 
     if fake_run:
         acc1, acc5 = accuracy(predicted_label_top5_list, labels_list)
-        print('top1-acc and top5-acc : ',acc1, acc5) # acc in the whole val set
+        print('top1-acc and top5-acc : ', acc1, acc5) # acc in the whole val set
         with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
             json.dump(origin_quality, f, indent=2)
-                                 
+
+    del predicted_label_top1_list 
+    del predicted_label_top5_list 
+    gc.collect()
+
     return tmp_inference_dic, tmp_total_dic
 
 
@@ -187,12 +194,12 @@ def accuracy(predicted_label_top5_list, labels):
     top1_acc = 0
     top5_acc =0
     for i, (predicted_label_top5, label) in enumerate(zip(predicted_label_top5_list, labels)):
-        if predicted_label_top5[0] == label.astype(predicted_label_top5[0].dtype):
+        if predicted_label_top5[0] == label:
             top1_acc += 1
-        if label.astype(predicted_label_top5[0].dtype) in predicted_label_top5:
+        if np.isin(label, predicted_label_top5):
             top5_acc += 1
-    top1_acc = "{:6.2f}".format(100*(top1_acc/len(labels)))
-    top5_acc = "{:6.2f}".format(100*(top5_acc/len(labels)))
+    top1_acc = round(100 * (top1_acc / len(labels)), 6) 
+    top5_acc = round(100 * (top5_acc / len(labels)), 6)
     return top1_acc,top5_acc
 
 
@@ -284,7 +291,6 @@ if __name__ == "__main__":
         del results
     else:
         already_run = 0
-     
     sucess_flag = False
     loop = 0 # for debugging
     while not sucess_flag:
@@ -417,6 +423,6 @@ if __name__ == "__main__":
 
         if already_run == max_run:
             break 
-        
+      
 
         
