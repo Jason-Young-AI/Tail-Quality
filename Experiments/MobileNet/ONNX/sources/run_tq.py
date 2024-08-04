@@ -1,6 +1,7 @@
 import mxnet as mx
 import numpy as np
 from mxnet import gluon, nd
+from mxnet import profiler
 from mxnet.gluon.data.vision import transforms
 from gluoncv.data import imagenet
 from collections import namedtuple
@@ -151,6 +152,7 @@ def inference(parameters):
     Batch = namedtuple('Batch', ['data'])
     val_data = tqdm(val_data, ascii=True)
 
+    # profiler.set_state('run')
     a = time.perf_counter()
     for batch_id, batch in enumerate(val_data, start=1):
         datas = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0)
@@ -159,18 +161,34 @@ def inference(parameters):
         inference_start = time.perf_counter()
         preprocess_time = inference_start - a 
         mod.forward(Batch([datas[0]]))
+        outputs=mod.get_outputs()
         inference_end = time.perf_counter()
         inference_time = inference_end - inference_start
         tmp_inference_dic[batch_id] = float(inference_time)
+
         postprocess_start = time.perf_counter()
-        outputs=mod.get_outputs()
-        for output in outputs[0]:
+        b = time.perf_counter()
+        for i, output in enumerate(outputs[1]):
+            if i == 0:
+                c = time.perf_counter()
+                # mx.nd.waitall()
+                # profiler.set_state('stop') 
+                fake1 = mx.nd.argmax(output).asnumpy() 
+                fake2 = mx.nd.topk(output).asnumpy()
+                # profiler.set_state('run')  
+                postprocess_start = time.perf_counter() + c - b  
             predicted_label_top1_list.append(mx.nd.argmax(output).asnumpy())
-            predicted_label_top5_list.append(mx.nd.topk(output, k=5).asnumpy())
+            predicted_label_top5_list.append(mx.nd.topk(output, k=6).asnumpy())
+
         postprocess_end = time.perf_counter()
         postprocess_time =  postprocess_end - postprocess_start
+
         total_time = preprocess_time + inference_time + postprocess_time
         tmp_total_dic[batch_id] = float(total_time)
+        # print('preprocess_time', preprocess_time)
+        # print('inference_time', inference_time)
+        # print('postprocess_time', postprocess_time)
+        # print('total_time', total_time)
 
         if fake_run:
             for label in labels[0]:
@@ -184,7 +202,8 @@ def inference(parameters):
         del outputs
         del datas
         del labels
-        
+        # mx.nd.waitall()
+        # profiler.set_state('stop') 
         a = time.perf_counter()
 
     if fake_run:
@@ -332,6 +351,9 @@ if __name__ == "__main__":
         logger.info(f'warm_run: {warm_run}')
         logger.info(f'fit_distribution_number: {fit_distribution_number}')
 
+        # if not fake_run:
+        #     profiler.set_config(profile_all=True, aggregate_stats=True, filename='profile_output.json')
+        
         tmp_inference_dic, tmp_total_dic = inference(params)
         if args.only_quality:
             logger.info(f'Only Get Quality')
@@ -433,6 +455,8 @@ if __name__ == "__main__":
             with open(result_path, 'wb') as f:
                 pickle.dump(tmp_results, f)
                 logger.info(f'len tmp_results["inference"] is {len(tmp_results["inference"])}')
+            with open(f'{result_path}.json', 'w') as f:
+                json.dump(tmp_results, f, indent=2) 
             del tmp_results
             del all_total_times
             del all_inference_times
