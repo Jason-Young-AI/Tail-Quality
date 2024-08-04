@@ -272,6 +272,7 @@ if __name__ == "__main__":
     parser.add_argument('--only-quality', action='store_true')
     parser.add_argument('--golden-path', type=str)
     parser.add_argument('--result-path', type=str)
+    parser.add_argument('--others-path', type=str)
 
     args = parser.parse_args()
 
@@ -344,6 +345,7 @@ if __name__ == "__main__":
             'only_quality': args.only_quality,
             'golden_path': args.golden_path,
             'result_path': args.result_path,
+            'others_path': args.others_path,
         }
 
         logger.info(f'-------before loop {loop}-------')

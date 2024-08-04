@@ -216,6 +216,7 @@ def inference(parameters):
         tmp_total_dic[batch_id] = float(total_time)
 
         if fake_run:
+            this_stats = list()
             for i in range(annot.size(0)):
                 seen += 1
                 labels = annot[i]
@@ -237,6 +238,7 @@ def inference(parameters):
                     if nl:
                         stats.append((torch.zeros(0, num_thresholds, dtype=torch.bool),
                                     torch.Tensor(), torch.Tensor(), target_class))
+                        this_stats.append(stats[-1])
                     # print("here")
                     continue
 
@@ -261,6 +263,7 @@ def inference(parameters):
                 else:
                     correct = torch.zeros(pred.shape[0], num_thresholds, dtype=torch.bool)
                 stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), target_class))
+                this_stats.append(stats[-1])
 
                 # print(stats)
 
@@ -294,8 +297,9 @@ def inference(parameters):
             for i in range(ncs):
                 iou_ls[i].append(iou.T[i].detach().cpu().numpy())
                 acc_ls[i].append(acc.T[i].detach().cpu().numpy())
+            this_iouls = [each_iou_ls[-1] for each_iou_ls in iou_ls]
+            this_accls = [each_acc_ls[-1] for each_acc_ls in acc_ls]
 
-        if fake_run:
             cls_loss = cls_loss.mean()
             reg_loss = reg_loss.mean()
             seg_loss = seg_loss.mean()
@@ -306,9 +310,13 @@ def inference(parameters):
             loss_classification_ls.append(cls_loss.item())
             loss_regression_ls.append(reg_loss.item())
             loss_segmentation_ls.append(seg_loss.item())
+
             if only_quality:
-                overall_result_dic[batch_id] = rating_K.cpu().numpy().tolist()
-                overall_golden_dic[batch_id] = groundTrue
+                overall_result_dic[batch_id] = dict(
+                    stats = this_stats,
+                    iouls = this_iouls,
+                    accls = this_accls,
+                )
 
         # logger.info('total_time, inference_time: ', total_time, inference_time)
         a = time.perf_counter()
@@ -389,10 +397,8 @@ def inference(parameters):
             json.dump(results, f, indent=2)
 
         if only_quality:
-            with open(result_path, 'w') as result_file:
-                json.dump(overall_result_dic, result_file, indent=2)
-            with open(golden_path, 'w') as golden_file:
-                json.dump(overall_golden_dic, golden_file, indent=2)
+            with open(result_path, 'wb') as result_file:
+                pickle.dump(overall_result_dic, result_file)
 
     return  tmp_inference_dic, tmp_total_dic
 

@@ -235,9 +235,11 @@ def inference(parameters):
     only_quality = parameters['only_quality']
     golden_path = parameters['golden_path']
     result_path = parameters['result_path']
+    others_path = parameters['others_path']
 
     overall_result_dic = dict()
     overall_golden_dic = dict()
+    overall_others_dic = dict()
 
     total_tasks = len(tasks)
     tmp_inference_dic = dict()
@@ -265,42 +267,52 @@ def inference(parameters):
             label = subset_data_frame.iloc[row_i, subset_data_frame.shape[1]-1]
             records.append({'prompt': prompt, 'answer': label, 'token_length': prompt_token_len, 'question_number': prompt_qests_num})
 
-        answers = []
+        answer_batches = batch_split([record['answer'] for record in records], batch_size)
+        token_length_batches = batch_split([record['token_length'] for record in records])
+        question_number_batches = batch_split([record['question_number'] for record in records])
         a = time.perf_counter()
         batches = batch_split([record['prompt'] for record in records], batch_size)
-        for batch_id, batch_input in tqdm(enumerate(batches, start=1), total=len(batches), desc=f'No. {task_id}/{total_tasks} (TT={(time.perf_counter() - total_inference_time_start):.2f}s)'):
+        for batch_id, batch_input in tqdm(enumerate(batches), total=len(batches), desc=f'No. {task_id}/{total_tasks} (TT={(time.perf_counter() - total_inference_time_start):.2f}s)'):
+            overall_batch_id += 1
             encode_inputs = prepare_input(tokenizer, batch_input)
             inference_start = time.perf_counter()
             preprocess_time = inference_start - a 
             outputs = llm.generate(**encode_inputs, max_new_tokens=1, pad_token_id=tokenizer.pad_token_id)
             inference_end = time.perf_counter()
             inference_time = inference_end - inference_start
-            tmp_inference_dic[batch_id] = float(inference_time)
+            tmp_inference_dic[overall_batch_id] = float(inference_time)
 
             postprocess_start = time.perf_counter()
-            answers.extend(tokenizer.batch_decode(outputs, skip_special_tokens=True))
+            answers = tokenizer.batch_decode(outputs, skip_special_tokens=True)
             postprocess_end = time.perf_counter()
             postprocess_time = postprocess_end - postprocess_start
             total_time = preprocess_time + inference_time + postprocess_time
             # print(inference_time)
             # print(total_time)
-            tmp_total_dic[batch_id] = float(total_time)
+            tmp_total_dic[overall_batch_id] = float(total_time)
+
+            if fake_run:
+                overall_result_dic[overall_batch_id] = [answer[-1] for answer in answers]
+                overall_golden_dic[overall_batch_id] = answer_batches[batch_id]
+                overall_others_dic[overall_batch_id] = dict(
+                    token_lengths = token_length_batches[batch_id],
+                    question_numbers = question_number_batches[batch_id],
+                )
 
             # logger.info('total_time, inference_time: ', total_time, inference_time)
             a = time.perf_counter()
-
-        if fake_run:
-            answers = [answer[-1] for answer in answers]
-
-            gold_answers = [record['answer'] for record in records]
-            token_lengths = [record['token_length'] for record in records]
-            question_numbers = [record['question_number'] for record in records]
-            main_results[task] = {'pred_answers': answers, 'gold_answers': gold_answers, 'token_lengths': token_lengths, 'question_numbers': question_numbers}
 
     logger.info(f'TT={(time.perf_counter() - total_inference_time_start):.2f}s')
     if fake_run:
         with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
             json.dump(main_results, f, indent=2)
+        if only_quality:
+            with open(result_path, 'w') as result_file:
+                json.dump(overall_result_dic, result_file, indent=2)
+            with open(golden_path, 'w') as golden_file:
+                json.dump(overall_golden_dic, golden_file, indent=2)
+            with open(others_path, 'w') as others_file:
+                json.dump(overall_others_dic, others_file, indent=2)
 
     return  tmp_inference_dic, tmp_total_dic
 
@@ -339,6 +351,11 @@ if __name__ == "__main__":
     parser.add_argument('--model-path', type=str, default="lmsys/vicuna-13b-v1.3")
     parser.add_argument('--run-mode', type=str, default="val", choices=["val", "test"])
     parser.add_argument('--batch-size', type=int, default=1)
+
+    parser.add_argument('--only-quality', action='store_true')
+    parser.add_argument('--golden-path', type=str)
+    parser.add_argument('--result-path', type=str)
+    parser.add_argument('--others-path', type=str)
 
     args = parser.parse_args()
 
@@ -411,6 +428,10 @@ if __name__ == "__main__":
                 'batch_size': args.batch_size,
                 'number_train': args.number_train,
                 'results_basepath': results_basepath,
+                'only_quality': args.only_quality,
+                'golden_path': args.golden_path,
+                'result_path': args.result_path,
+                'others_path': args.others_path,
             }
 
             logger.info(f'-------before loop {loop}-------')
@@ -419,6 +440,9 @@ if __name__ == "__main__":
             logger.info(f'fit_distribution_number: {fit_distribution_number}')
 
             tmp_inference_dic, tmp_total_dic = inference(params)
+            if args.only_quality:
+                logger.info(f'Only Get Quality')
+                break
             logger.info(f'after inference')
             if not fake_run:
                 already_run += 1 
