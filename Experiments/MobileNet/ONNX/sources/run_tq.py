@@ -157,7 +157,7 @@ def inference(parameters):
     for batch_id, batch in enumerate(val_data, start=1):
         datas = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0)
         labels = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0)
-        
+
         inference_start = time.perf_counter()
         preprocess_time = inference_start - a 
         mod.forward(Batch([datas[0]]))
@@ -178,7 +178,7 @@ def inference(parameters):
                 # profiler.set_state('run')  
                 postprocess_start = time.perf_counter() + c - b  
             predicted_label_top1_list.append(mx.nd.argmax(output).asnumpy())
-            predicted_label_top5_list.append(mx.nd.topk(output, k=6).asnumpy())
+            predicted_label_top5_list.append(mx.nd.topk(output, k=5).asnumpy())
 
         postprocess_end = time.perf_counter()
         postprocess_time =  postprocess_end - postprocess_start
@@ -360,6 +360,11 @@ if __name__ == "__main__":
         if args.only_quality:
             logger.info(f'Only Get Quality')
             break
+        # if not fake_run:
+        #     mx.nd.waitall()
+        #     profiler.set_state('stop')
+        #     logger.info(profiler.dumps())
+
         logger.info(f'after inference')
         if not fake_run:
             already_run += 1 
@@ -474,6 +479,3 @@ if __name__ == "__main__":
 
         if already_run == max_run:
             break 
-      
-
-        
