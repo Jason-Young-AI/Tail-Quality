@@ -168,7 +168,7 @@ def inference(parameters):
 
         postprocess_start = time.perf_counter()
         b = time.perf_counter()
-        for i, output in enumerate(outputs[1]):
+        for i, output in enumerate(outputs[0]):
             if i == 0:
                 c = time.perf_counter()
                 # mx.nd.waitall()
