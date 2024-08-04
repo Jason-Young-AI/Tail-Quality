@@ -268,8 +268,8 @@ def inference(parameters):
             records.append({'prompt': prompt, 'answer': label, 'token_length': prompt_token_len, 'question_number': prompt_qests_num})
 
         answer_batches = batch_split([record['answer'] for record in records], batch_size)
-        token_length_batches = batch_split([record['token_length'] for record in records])
-        question_number_batches = batch_split([record['question_number'] for record in records])
+        token_length_batches = batch_split([record['token_length'] for record in records], batch_size)
+        question_number_batches = batch_split([record['question_number'] for record in records], batch_size)
         a = time.perf_counter()
         batches = batch_split([record['prompt'] for record in records], batch_size)
         for batch_id, batch_input in tqdm(enumerate(batches), total=len(batches), desc=f'No. {task_id}/{total_tasks} (TT={(time.perf_counter() - total_inference_time_start):.2f}s)'):
