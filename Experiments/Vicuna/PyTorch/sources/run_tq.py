@@ -246,6 +246,7 @@ def inference(parameters):
     tmp_total_dic = dict()
     main_results = dict()
     total_inference_time_start = time.perf_counter()
+    overall_batch_id = 0
     for task_id, (task, (dev_path, subset_path)) in enumerate(zip(tasks, data_paths)):
         # print(f' - Testing {task} ...')
         records = []
