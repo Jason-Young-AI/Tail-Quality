@@ -448,7 +448,6 @@ if __name__ == "__main__":
         logger.info(f'fit_distribution_number: {fit_distribution_number}')
         if fake_run:
             logger.info(f'this run is fake')
-
         fake_run = False
 
         if already_run == max_run:
