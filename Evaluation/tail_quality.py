@@ -20,8 +20,6 @@ def tail_quality(quality_calculation_function: Callable[[tuple[Any, list[Any], l
 
     qualities_at_thresholds = list()
 
-    itertools.product(range(len(multiple_inference_times)), range(len(thresholds)))
-
     inference_validities_at_thresholds = list()
     # [
     #   [

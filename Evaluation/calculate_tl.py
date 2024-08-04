@@ -19,20 +19,20 @@ if __name__ == '__main__':
     all_total_time = list()
 
     with open(alltime_filepath, 'rb') as alltime_file:
-        all_time = pickle.load(alltime_file)
+        alltime = pickle.load(alltime_file)
         total_round = 0
-        for round_inference_time, round_total_time in zip(all_time['inference'], all_time['total']):
-            total_round += 0
+        for round_inference_time, round_total_time in zip(alltime['inference'], alltime['total']):
+            total_round += 1
             for batch_id, batch_time in round_inference_time.items():
                 all_inference_time.append(batch_time)
             for batch_id, batch_time in round_total_time.items():
                 all_total_time.append(batch_time)
-    
+
     assert len(all_inference_time) == len(all_total_time)
 
     inference_tail_latency = tail_latency(all_inference_time, percentiles)
     total_tail_latency = tail_latency(all_total_time, percentiles)
 
-    print(f'All Latency(Second) at Percentile(%)')
+    print(f'Total Round: {total_round} | All Latency(Second) at Percentile(%)')
     for p, i, t in zip(percentiles, inference_tail_latency, total_tail_latency):
         print(f'{p} %\t: {i}\t {t}')
