@@ -129,9 +129,17 @@ def inference(parameters):
     results_basepath = parameters['results_basepath']
     batch_size = parameters['batch_size']
     ctx = parameters['ctx']
+
+    only_quality = parameters['only_quality']
+    golden_path = parameters['golden_path']
+    result_path = parameters['result_path']
+
     tmp_inference_dic = dict()
     tmp_total_dic = dict() 
-    
+
+    overall_result_dic = dict()
+    overall_golden_dic = dict()
+
     predicted_label_top1_list = list()
     predicted_label_top5_list = list()
     labels_list = list()
@@ -170,6 +178,9 @@ def inference(parameters):
             batch_acc1, batch_acc5 = accuracy(predicted_label_top5_list[-batch_size:], labels_list[-batch_size:])
             origin_quality['top1_acc'][batch_id] = batch_acc1 
             origin_quality['top5_acc'][batch_id] = batch_acc5 
+            if only_quality:
+                overall_result_dic[batch_id] = ([top1.tolist() for top1 in predicted_label_top1_list[-batch_size:]], [top5.tolist() for top5 in predicted_label_top5_list[-batch_size:]])
+                overall_golden_dic[batch_id] = labels_list
         del outputs
         del datas
         del labels
@@ -181,6 +192,11 @@ def inference(parameters):
         print('top1-acc and top5-acc : ', acc1, acc5) # acc in the whole val set
         with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
             json.dump(origin_quality, f, indent=2)
+        if only_quality:
+            with open(result_path, 'w') as result_file:
+                json.dump(overall_result_dic, result_file, indent=2)
+            with open(golden_path, 'w') as golden_file:
+                json.dump(overall_golden_dic, golden_file, indent=2)
 
     del predicted_label_top1_list 
     del predicted_label_top5_list 
@@ -233,6 +249,10 @@ if __name__ == "__main__":
     parser.add_argument('--device', type=str, required=True)
     parser.add_argument('--dataset-path', type=str, required=True)
     parser.add_argument('--model-path', type=str, required=True)
+
+    parser.add_argument('--only-quality', action='store_true')
+    parser.add_argument('--golden-path', type=str)
+    parser.add_argument('--result-path', type=str)
 
     args = parser.parse_args()
 
@@ -302,6 +322,9 @@ if __name__ == "__main__":
             'results_basepath': results_basepath,
             'batch_size': batch_size,
             'ctx': ctx,
+            'only_quality': args.only_quality,
+            'golden_path': args.golden_path,
+            'result_path': args.result_path,
         }
 
         logger.info(f'-------before loop {loop}-------')
@@ -310,6 +333,9 @@ if __name__ == "__main__":
         logger.info(f'fit_distribution_number: {fit_distribution_number}')
 
         tmp_inference_dic, tmp_total_dic = inference(params)
+        if args.only_quality:
+            logger.info(f'Only Get Quality')
+            break
         logger.info(f'after inference')
         if not fake_run:
             already_run += 1 

@@ -142,6 +142,13 @@ def inference(parameters):
     params = parameters['params']
     seg_mode = parameters['seg_mode']
 
+    only_quality = params['only_quality']
+    golden_path = params['golden_path']
+    result_path = params['result_path']
+
+    overall_result_dic = dict()
+    overall_golden_dic = dict()
+
     loss_regression_ls = []
     loss_classification_ls = []
     loss_segmentation_ls = []
@@ -299,6 +306,9 @@ def inference(parameters):
             loss_classification_ls.append(cls_loss.item())
             loss_regression_ls.append(reg_loss.item())
             loss_segmentation_ls.append(seg_loss.item())
+            if only_quality:
+                overall_result_dic[batch_id] = rating_K.cpu().numpy().tolist()
+                overall_golden_dic[batch_id] = groundTrue
 
         # logger.info('total_time, inference_time: ', total_time, inference_time)
         a = time.perf_counter()
@@ -378,6 +388,12 @@ def inference(parameters):
         with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
             json.dump(results, f, indent=2)
 
+        if only_quality:
+            with open(result_path, 'w') as result_file:
+                json.dump(overall_result_dic, result_file, indent=2)
+            with open(golden_path, 'w') as golden_file:
+                json.dump(overall_golden_dic, golden_file, indent=2)
+
     return  tmp_inference_dic, tmp_total_dic
 
 
@@ -432,6 +448,11 @@ if __name__ == "__main__":
                     help='Confidence threshold in NMS')
     parser.add_argument('--iou_thres', type=float, default=0.6,
                     help='IoU threshold in NMS')
+
+    parser.add_argument('--only-quality', action='store_true')
+    parser.add_argument('--golden-path', type=str)
+    parser.add_argument('--result-path', type=str)
+
     args = parser.parse_args()
 
 
@@ -524,7 +545,10 @@ if __name__ == "__main__":
                 'fake_run': fake_run,
                 'opt': args,
                 'params': params,
-                'seg_mode': seg_mode
+                'seg_mode': seg_mode,
+                'only_quality': args.only_quality,
+                'golden_path': args.golden_path,
+                'result_path': args.result_path,
             }
 
             logger.info(f'-------before loop {loop}-------')
@@ -533,6 +557,9 @@ if __name__ == "__main__":
             logger.info(f'fit_distribution_number: {fit_distribution_number}')
             
             tmp_inference_dic, tmp_total_dic = inference(this_params)
+            if args.only_quality:
+                logger.info(f'Only Get Quality')
+                break
             logger.info(f'after inference')
             if not fake_run:
                 already_run += 1 

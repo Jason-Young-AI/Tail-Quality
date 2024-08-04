@@ -142,8 +142,16 @@ def inference(parameters):
     results_basepath = parameters['results_basepath']
     gpu = parameters['gpu']
     batch_size = parameters['batch_size']
+
+    only_quality = parameters['only_quality']
+    golden_path = parameters['golden_path']
+    result_path = parameters['result_path']
+
     tmp_inference_dic = dict()
     tmp_total_dic = dict()
+
+    overall_result_dic = dict()
+    overall_golden_dic = dict()
 
     predicted_label_top1_list = list()
     predicted_label_top5_list = list()
@@ -183,6 +191,9 @@ def inference(parameters):
             batch_acc1, batch_acc5 = accuracy(predicted_label_top5_list[-batch_size:], targets[-batch_size:])
             origin_quality['top1_acc'][batch_id] = batch_acc1 
             origin_quality['top5_acc'][batch_id] = batch_acc5 
+            if only_quality:
+                overall_result_dic[batch_id] = ([top1.tolist() for top1 in predicted_label_top1_list[-batch_size:]], [top5.tolist() for top5 in predicted_label_top5_list[-batch_size:]])
+                overall_golden_dic[batch_id] = targets_list
 
         a = time.perf_counter()
    
@@ -191,6 +202,11 @@ def inference(parameters):
         print('top1-acc and top5-acc : ',acc1, acc5) # acc in the whole val set
         with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
             json.dump(origin_quality, f, indent=2)
+        if only_quality:
+            with open(result_path, 'w') as result_file:
+                json.dump(overall_result_dic, result_file, indent=2)
+            with open(golden_path, 'w') as golden_file:
+                json.dump(overall_golden_dic, golden_file, indent=2)
                                  
     return tmp_inference_dic, tmp_total_dic
 
@@ -260,6 +276,11 @@ if __name__ == '__main__':
     parser.add_argument('--fit-run-number', type=int, default=2)
     parser.add_argument('--rJSD-threshold', type=float, default=0.05)
     parser.add_argument('--max-run', type=int, default=100000)
+
+    parser.add_argument('--only-quality', action='store_true')
+    parser.add_argument('--golden-path', type=str)
+    parser.add_argument('--result-path', type=str)
+
     args = parser.parse_args()
 
     results_basepath = Path(args.results_basepath)
@@ -338,6 +359,9 @@ if __name__ == '__main__':
                 'results_basepath': results_basepath,
                 'gpu': args.gpu,
                 'batch_size': args.batch_size,
+                'only_quality': args.only_quality,
+                'golden_path': args.golden_path,
+                'result_path': args.result_path,
             }
 
             logger.info(f'-------before loop {loop}-------')
@@ -346,6 +370,9 @@ if __name__ == '__main__':
             logger.info(f'fit_distribution_number: {fit_distribution_number}')
 
             tmp_inference_dic, tmp_total_dic = inference(params)
+            if args.only_quality:
+                logger.info(f'Only Get Quality')
+                break
             logger.info(f'after inference')
             if not fake_run:
                 already_run += 1 

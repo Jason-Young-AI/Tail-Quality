@@ -8,6 +8,7 @@ import pathlib
 import logging
 import argparse
 import matplotlib.pyplot as plt
+import urllib.request
 
 from pathlib import Path
 
@@ -200,10 +201,15 @@ def inference(parameters):
     detr = parameters['detr']
     fake_run = parameters['fake_run']
     results_basepath = parameters['results_basepath']
+
+    only_quality = parameters['only_quality']
+    golden_path = parameters['golden_path']
+    result_path = parameters['result_path']
     assert len(img_paths) == len(img_ids), "Fatal Error!"
 
     tmp_inference_dic = dict()
     tmp_total_dic = dict()
+    overall_result_dic = dict()
     all_results = list()
     a = time.perf_counter()
     for batch_id, (img_path, img_id) in tqdm(enumerate(zip(img_paths, img_ids), start=1), ascii=True, total=len(img_ids)):
@@ -245,6 +251,8 @@ def inference(parameters):
 
         if fake_run:
             all_results.append(add_other(results, image_sizes, images.shape[1:-1].as_list()))
+            if only_quality:
+                overall_result_dic[batch_id] = results
 
         # logger.info('total_time, inference_time: ', total_time, inference_time)
         a = time.perf_counter()
@@ -261,6 +269,11 @@ def inference(parameters):
 
         with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
             json.dump(main_results, f, indent=2)
+        if only_quality:
+            with open(result_path, 'w') as result_file:
+                json.dump(overall_result_dic, result_file, indent=2)
+            annotations_file_url = 'https://huggingface.co/datasets/AIJasonYoung/Tail-Quality-Assets/resolve/main/DETR/coco_2017_annotations.json'
+            urllib.request.urlretrieve(annotations_file_url, golden_path)
 
     return  tmp_inference_dic, tmp_total_dic
 
@@ -295,6 +308,10 @@ if __name__ == "__main__":
 
     parser.add_argument('--dataset-path', type=str, required=True)
     parser.add_argument('--model-path', type=str, required=True)
+
+    parser.add_argument('--only-quality', action='store_true')
+    parser.add_argument('--golden-path', type=str)
+    parser.add_argument('--result-path', type=str)
 
     args = parser.parse_args()
 
@@ -356,6 +373,9 @@ if __name__ == "__main__":
             'detr': detr,
             'fake_run': fake_run,
             'results_basepath': results_basepath,
+            'only_quality': args.only_quality,
+            'golden_path': args.golden_path,
+            'result_path': args.result_path,
         }
 
         logger.info(f'-------before loop {loop}-------')
@@ -364,6 +384,9 @@ if __name__ == "__main__":
         logger.info(f'fit_distribution_number: {fit_distribution_number}')
 
         tmp_inference_dic, tmp_total_dic = inference(params)
+        if args.only_quality:
+            logger.info(f'Only Get Quality')
+            break
         logger.info(f'after inference')
         if not fake_run:
             already_run += 1 

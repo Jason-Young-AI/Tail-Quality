@@ -232,6 +232,13 @@ def inference(parameters):
     number_train = parameters['number_train']
     results_basepath = parameters['results_basepath']
 
+    only_quality = parameters['only_quality']
+    golden_path = parameters['golden_path']
+    result_path = parameters['result_path']
+
+    overall_result_dic = dict()
+    overall_golden_dic = dict()
+
     total_tasks = len(tasks)
     tmp_inference_dic = dict()
     tmp_total_dic = dict()

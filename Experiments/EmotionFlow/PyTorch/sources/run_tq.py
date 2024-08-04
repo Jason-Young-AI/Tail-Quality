@@ -348,10 +348,21 @@ def load_meld_and_builddataset(file_path, train=False):
     return dataset
 
 
-def inference(model, dataloader):
+def inference(parameters):
     pred_list = []
     y_true_list = []
-    
+
+    overall_result_dic = dict()
+    overall_golden_dic = dict()
+
+    fake_run = parameters['fake_run']
+    model = parameters['model']
+    dataloader = parameters['dataloader']
+
+    only_quality = parameters['only_quality']
+    golden_path = parameters['golden_path']
+    result_path = parameters['result_path']
+
     tmp_inference_dic = dict()
     tmp_total_dic = dict()
     tq_test = tqdm(total=len(dataloader), desc="inference", position=0)
@@ -381,8 +392,24 @@ def inference(model, dataloader):
         total_time = preprocess_time + inference_time + postprocess_time
         tmp_total_dic[batch_id] = float(total_time)
         tq_test.update()
+        if fake_run:
+            if only_quality:
+                this_result_list = list()
+                this_golden_list = list()
+                for batch_idx in range(mask.shape[0]):
+                    for seq_idx in range(mask.shape[1]):
+                        if mask[batch_idx][seq_idx]:
+                            this_result_list.append(outputs[batch_idx][seq_idx])
+                            this_golden_list.append(emotion_idxs[batch_idx][seq_idx])
+                overall_result_dic[batch_id] = this_result_list
+                overall_golden_dic[batch_id] = this_golden_list
         a = time.perf_counter()
 
+    if only_quality:
+        with open(result_path, 'w') as result_file:
+            json.dump(overall_result_dic, result_file, indent=2)
+        with open(golden_path, 'w') as golden_file:
+            json.dump(overall_golden_dic, golden_file, indent=2)
     return  tmp_inference_dic, tmp_total_dic
 
 
@@ -416,6 +443,11 @@ if __name__ == '__main__':
 
     parser.add_argument('--dataset-path', type=str, required=True)
     parser.add_argument('--model-path', type=str, required=True)
+
+    parser.add_argument('--only-quality', action='store_true')
+    parser.add_argument('--golden-path', type=str)
+    parser.add_argument('--result-path', type=str)
+
     args = parser.parse_args()
 
 
@@ -489,15 +521,25 @@ if __name__ == '__main__':
     with torch.no_grad():
         while not sucess_flag:
             loop += 1 # for debugging
-    
+            params = {
+                'model': model,
+                'dataloader': dataloader,
+                'fake_run': fake_run,
+                'only_quality': args.only_quality,
+                'golden_path': args.golden_path,
+                'result_path': args.result_path,
+            }
             logger.info(f'-------before loop {loop}-------')
             logger.info(f'already_run: {already_run}')
             logger.info(f'warm_run: {warm_run}')
             logger.info(f'fit_distribution_number: {fit_distribution_number}')
             
             logger.info(f'inference start')
-            tmp_inference_dic, tmp_total_dic = inference(model, dataloader)
+            tmp_inference_dic, tmp_total_dic = inference(params)
             logger.info(f'inference end')
+            if args.only_quality:
+                logger.info(f'Only Get Quality')
+                break
             if not fake_run:
                 already_run += 1 
                 logger.info(f'already_run: {already_run}')  

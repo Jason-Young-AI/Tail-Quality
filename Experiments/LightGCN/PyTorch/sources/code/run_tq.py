@@ -153,6 +153,11 @@ def inference(params):
     dataset = params['dataset']
     Recmodel = params['Recmodel']
     fake_run = params['fake_run']
+
+    only_quality = params['only_quality']
+    golden_path = params['golden_path']
+    result_path = params['result_path']
+
     u_batch_size = world.config['test_u_batch_size']
     dataset: utils.BasicDataset
     testDict: dict = dataset.testDict
@@ -169,7 +174,10 @@ def inference(params):
     users_list = []
     rating_list = []
     groundTrue_list = []
-        
+
+    overall_result_dic = dict()
+    overall_golden_dic = dict()
+
     total_batch = len(users) // u_batch_size + 1
     tmp_inference_dic = dict()
     tmp_total_dic = dict()
@@ -187,7 +195,7 @@ def inference(params):
         inference_time = inference_end - inference_start
         tmp_inference_dic[batch_id] = float(inference_time)
         postprocess_start = time.perf_counter()
-        
+
         exclude_index = []
         exclude_items = []
         for range_i, items in enumerate(allPos):
@@ -205,6 +213,10 @@ def inference(params):
         postprocess_time = postprocess_end - postprocess_start
         total_time = preprocess_time + inference_time + postprocess_time
         tmp_total_dic[batch_id] = float(total_time)
+        if fake_run:
+            if only_quality:
+                overall_result_dic[batch_id] = rating_K.cpu().numpy().tolist()
+                overall_golden_dic[batch_id] = groundTrue
         # logger.info('total_time, inference_time: ', total_time, inference_time)
         a = time.perf_counter()
 
@@ -215,7 +227,12 @@ def inference(params):
     pre_results = []
     for batch_id, x in enumerate(X, start=1):
         pre_results.append(test_one_batch(x))
-        
+    if fake_run:
+        if only_quality:
+            with open(result_path, 'w') as result_file:
+                json.dump(overall_result_dic, result_file, indent=2)
+            with open(golden_path, 'w') as golden_file:
+                json.dump(overall_golden_dic, golden_file, indent=2)
     return  tmp_inference_dic, tmp_total_dic
     
     # for result in pre_results: 
@@ -257,6 +274,11 @@ if __name__ == "__main__":
 
     parser.add_argument('--dataset-path', type=str, required=True)
     parser.add_argument('--model-path', type=str, required=True)
+
+    parser.add_argument('--only-quality', action='store_true')
+    parser.add_argument('--golden-path', type=str)
+    parser.add_argument('--result-path', type=str)
+
     args = parser.parse_args()
 
 
@@ -310,7 +332,10 @@ if __name__ == "__main__":
             params = {
                 'dataset': dataset,
                 'Recmodel': Recmodel,
-                'fake_run': fake_run
+                'fake_run': fake_run,
+                'only_quality': args.only_quality,
+                'golden_path': args.golden_path,
+                'result_path': args.result_path,
             }
 
             logger.info(f'-------before loop {loop}-------')
@@ -320,6 +345,9 @@ if __name__ == "__main__":
             
             logger.info(f'inference start')
             tmp_inference_dic, tmp_total_dic = inference(params)
+            if args.only_quality:
+                logger.info(f'Only Get Quality')
+                break
             logger.info(f'inference end')
 
             if not fake_run:

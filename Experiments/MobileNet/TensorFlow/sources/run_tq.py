@@ -126,12 +126,19 @@ def inference(parameters):
     predictions = parameters['predictions']
     session = parameters['session']
 
+    only_quality = parameters['only_quality']
+    golden_path = parameters['golden_path']
+    result_path = parameters['result_path']
+
     golden_label_list = list()
     predicted_label_top1_list = list()
     predicted_label_top5_list = list()
 
     tmp_inference_dic = dict()
     tmp_total_dic = dict()
+
+    overall_result_dic = dict()
+    overall_golden_dic = dict()
 
     a = time.perf_counter()
     batch_id = 0
@@ -159,6 +166,9 @@ def inference(parameters):
             if fake_run:
                 for label in label_batch:
                     golden_label_list.append(int(label))
+                if only_quality:
+                    overall_result_dic[batch_id] = (predicted_label_top1_list[-batch_size:], predicted_label_top5_list[-batch_size:])
+                    overall_golden_dic[batch_id] = golden_label_list
         except tf.errors.OutOfRangeError:
             break
         a = time.perf_counter()
@@ -183,6 +193,11 @@ def inference(parameters):
         )
         with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
             json.dump(main_results, f, indent=2)
+        if only_quality:
+            with open(result_path, 'w') as result_file:
+                json.dump(overall_result_dic, result_file, indent=2)
+            with open(golden_path, 'w') as golden_file:
+                json.dump(overall_golden_dic, golden_file, indent=2)
 
     return  tmp_inference_dic, tmp_total_dic
 
@@ -217,6 +232,10 @@ if __name__ == "__main__":
     parser.add_argument('--dataset-path', type=str, required=True)
     parser.add_argument('--model-path', type=str, required=True)
     parser.add_argument('--workers', default=8, type=int)
+
+    parser.add_argument('--only-quality', action='store_true')
+    parser.add_argument('--golden-path', type=str)
+    parser.add_argument('--result-path', type=str)
 
     args = parser.parse_args()
 
@@ -298,6 +317,9 @@ if __name__ == "__main__":
                 'inputs': inputs,
                 'predictions': predictions,
                 'session': session,
+                'only_quality': args.only_quality,
+                'golden_path': args.golden_path,
+                'result_path': args.result_path,
             }
 
             logger.info(f'-------before loop {loop}-------')
@@ -306,6 +328,9 @@ if __name__ == "__main__":
             logger.info(f'fit_distribution_number: {fit_distribution_number}')
 
             tmp_inference_dic, tmp_total_dic = inference(params)
+            if args.only_quality:
+                logger.info(f'Only Get Quality')
+                break
             logger.info(f'after inference')
             if not fake_run:
                 already_run += 1 
