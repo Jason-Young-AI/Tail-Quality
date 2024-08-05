@@ -32,7 +32,7 @@ class LightGCN(Task):
         # each element of inference_results must be a list
         if len(results) == 0:
             return float('NaN')
-        
+
         topk = 20
         total_precision = 0
         total_recall = 0
