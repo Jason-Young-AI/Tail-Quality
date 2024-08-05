@@ -47,7 +47,7 @@ if __name__ == '__main__':
     parser.add_argument('--worker-number', type=int, default=8)
     args = parser.parse_args()
 
-    specific_thresholds = numpy.array(args.specific_thresholds, dtype=float).tolist()
+    specific_thresholds = numpy.array(args.specific_thresholds, dtype=float).tolist() if args.specific_thresholds is not None else numpy.array([], dtype=float)
     if len(specific_thresholds) != 0:
         assert args.specific_filepath is not None
         specific_filepath = pathlib.Path(args.specific_filepath)
