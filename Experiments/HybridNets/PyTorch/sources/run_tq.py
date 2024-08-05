@@ -123,11 +123,11 @@ def fit(ins_times, fit_type='kde'):
 def check_fit_dynamic(fit_distribution_models, fit_distribution_model, all_times, window_size):
     total_js_dis = 0
     all_times = numpy.array(all_times)
-    current_distribution = fit_distribution_model 
+    current_distribution = fit_distribution_model
     compared_distributions = fit_distribution_models
     for compared_distribution in compared_distributions:
         epsilon = 1e-8
-        x = numpy.linspace(all_times.min(), all_times.max(), 1000).reshape(-1, 1) 
+        x = numpy.linspace(all_times.min(), all_times.max(), 1000).reshape(-1, 1)
         js_dis = jensenshannon(numpy.exp(current_distribution.score_samples(x))+epsilon, numpy.exp(compared_distribution.score_samples(x))+epsilon)
         total_js_dis += js_dis
     avg_jsd = total_js_dis/window_size
@@ -193,7 +193,7 @@ def inference(parameters):
 
 
         inference_start = time.perf_counter()
-        preprocess_time = inference_start - a 
+        preprocess_time = inference_start - a
         cls_loss, reg_loss, seg_loss, regression, classification, anchors, segmentation = model(imgs, annot,
                                                                                                 seg_annot,
                                                                                                 obj_list=params.obj_list)
@@ -238,7 +238,9 @@ def inference(parameters):
                     if nl:
                         stats.append((torch.zeros(0, num_thresholds, dtype=torch.bool),
                                     torch.Tensor(), torch.Tensor(), target_class))
-                        this_stats.append(stats[-1])
+                        this_stat = stats[-1]
+                        this_stat = (this_stat[0].numpy(), this_stat[1].numpy(), this_stat[2].numpy(), this_stat[3])
+                        this_stats.append(this_stat)
                     # print("here")
                     continue
 
@@ -264,7 +266,7 @@ def inference(parameters):
                     correct = torch.zeros(pred.shape[0], num_thresholds, dtype=torch.bool)
                 stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), target_class))
                 this_stat = stats[-1]
-                this_stat = (this_stat[0].numpy(), this_stat[1].numpy(), this_stat[2].numpy(), this_stat[3].numpy, this_stat[4])
+                this_stat = (this_stat[0].numpy(), this_stat[1].numpy(), this_stat[2].numpy(), this_stat[3])
                 this_stats.append(this_stat)
 
                 # print(stats)
@@ -282,7 +284,7 @@ def inference(parameters):
                 # anh[seg_0 == 1] = (0,255,0)
                 # anh[seg_0 == 2] = (0,0,255)
                 # anh = np.uint8(anh)
-                # cv2.imwrite('segmentation-{}.jpg'.format(filenames[i]),anh)         
+                # cv2.imwrite('segmentation-{}.jpg'.format(filenames[i]),anh)
             if seg_mode == MULTICLASS_MODE:
                 segmentation = segmentation.log_softmax(dim=1).exp()
                 _, segmentation = torch.max(segmentation, 1)  # (bs, C, H, W) -> (bs, H, W)
@@ -299,8 +301,8 @@ def inference(parameters):
             for i in range(ncs):
                 iou_ls[i].append(iou.T[i].detach().cpu().numpy())
                 acc_ls[i].append(acc.T[i].detach().cpu().numpy())
-            this_iou_ls = [each_iou_ls[-1] for each_iou_ls in iou_ls]
-            this_acc_ls = [each_acc_ls[-1] for each_acc_ls in acc_ls]
+            this_iou_ls = [each_iou_ls[-1].copy() for each_iou_ls in iou_ls]
+            this_acc_ls = [each_acc_ls[-1].copy() for each_acc_ls in acc_ls]
 
             cls_loss = cls_loss.mean()
             reg_loss = reg_loss.mean()
@@ -409,12 +411,12 @@ def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
     inference_data = list(range(1, len(rjsds['inference']) + 1))
     total_data = list(range(1, len(rjsds['total']) + 1))
     fig, ax = plt.subplots()
-    
+
     ax.plot(inference_data, rjsds['inference'], marker='o', linestyle='-', color='b', label='rJSD(inference time)')
     ax.plot(total_data, rjsds['total'], marker='o', linestyle='-', color='y', label='rJSD(total time)')
     ax.set_title('rJSD Fitting Progress')
     ax.set_xlabel('Fitting Round')
-    
+
     ax.set_ylabel('rJSD')
     ax.grid(True)
     ax.legend()
@@ -468,8 +470,8 @@ if __name__ == "__main__":
         assert args.result_path is not None
 
     results_basepath = pathlib.Path(args.results_basepath)
-    min_run = args.min_run 
-    warm_run = args.warm_run 
+    min_run = args.min_run
+    warm_run = args.warm_run
     window_size = args.window_size
     fit_run_number = args.fit_run_number
     rJSD_threshold = args.rJSD_threshold
@@ -530,7 +532,7 @@ if __name__ == "__main__":
                                ratios=eval(params.anchors_ratios), scales=eval(params.anchors_scales),
                                seg_classes=len(params.seg_list), backbone_name=args.backbone,
                                seg_mode=seg_mode)
-    
+
     try:
         model.load_state_dict(torch.load(weights_path, map_location=torch.device('cpu')))
     except:
@@ -566,20 +568,20 @@ if __name__ == "__main__":
             logger.info(f'already_run: {already_run}')
             logger.info(f'warm_run: {warm_run}')
             logger.info(f'fit_distribution_number: {fit_distribution_number}')
-            
+
             tmp_inference_dic, tmp_total_dic = inference(this_params)
             if args.only_quality:
                 logger.info(f'Only Get Quality')
                 break
             logger.info(f'after inference')
             if not fake_run:
-                already_run += 1 
-                logger.info(f'already_run: {already_run}')  
+                already_run += 1
+                logger.info(f'already_run: {already_run}')
                 all_inference_times = list()
-                all_total_times = list() 
-                if result_path.exists(): 
+                all_total_times = list()
+                if result_path.exists():
                     with open (result_path, 'rb') as f:
-                        results = pickle.load(f) 
+                        results = pickle.load(f)
                         tmp_results = results.copy()
                         for inference_times in tmp_results['inference']:
                             for inference_time in inference_times.values():
@@ -603,25 +605,25 @@ if __name__ == "__main__":
                 for key, value in tmp_total_dic.items():
                     all_total_times.append(value)
 
-                logger.info(f'(already_run - warm_run) % fit_run_number == {(already_run - warm_run) % fit_run_number}') 
+                logger.info(f'(already_run - warm_run) % fit_run_number == {(already_run - warm_run) % fit_run_number}')
                 logger.info(f"fit_distribution_number % window_size == {fit_distribution_number % window_size}")
                 if already_run > warm_run and (already_run - warm_run) % fit_run_number == 0:
-                    fit_inference_distribution_model = fit(all_inference_times) 
+                    fit_inference_distribution_model = fit(all_inference_times)
                     fit_total_distribution_model = fit(all_total_times)
                     if fit_distribution_number % window_size == 0 and fit_distribution_number != 0:
                         inference_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'inference'], key=lambda x: int(x.stem.split('-')[-1]))
                         total_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'total'], key=lambda x: int(x.stem.split('-')[-1]))
                         fit_inference_distribution_models = list()
-                        fit_total_distribution_models = list() 
+                        fit_total_distribution_models = list()
                         for inference_model_path in inference_model_paths[-window_size:]:
                             with open(inference_model_path, 'rb') as f:
                                 distribution_model = pickle.load(f)
-                                fit_inference_distribution_models.append(distribution_model) 
+                                fit_inference_distribution_models.append(distribution_model)
                         for total_model_path in total_model_paths[-window_size:]:
                             with open(total_model_path, 'rb') as f:
                                 distribution_model = pickle.load(f)
                                 fit_total_distribution_models.append(distribution_model)
-                                
+
                         logger.info(f'start_check_fit')
                         inference_rjsd = check_fit_dynamic(fit_inference_distribution_models, fit_inference_distribution_model, all_inference_times, window_size)
                         total_rjsd = check_fit_dynamic(fit_total_distribution_models, fit_total_distribution_model, all_total_times, window_size)
@@ -632,9 +634,9 @@ if __name__ == "__main__":
                         logger.info(f'inference_rjsd is {inference_rjsd} / total_rjsd is {total_rjsd}')
                         sucess_flag = True if inference_rjsd <= rJSD_threshold and total_rjsd <= rJSD_threshold else False
                         if inference_rjsd <= rJSD_threshold:
-                            logger.info('inference_times has fitted') 
+                            logger.info('inference_times has fitted')
                         if total_rjsd <= rJSD_threshold:
-                            logger.info('total_times has fitted') 
+                            logger.info('total_times has fitted')
                         logger.info(f'start_draw_rjsds')
                         if rjsds_path.exists():
                             with open(rjsds_path, 'rb') as f:
@@ -652,7 +654,7 @@ if __name__ == "__main__":
                             tmp_rjsds['total'].append(total_rjsd)
                         with open(rjsds_path, 'wb') as f:
                             pickle.dump(tmp_rjsds, f)
-                        draw_rjsds(tmp_rjsds, results_basepath) 
+                        draw_rjsds(tmp_rjsds, results_basepath)
                         del tmp_rjsds
                         logger.info(f'end_draw_rjsds')
 
@@ -662,15 +664,15 @@ if __name__ == "__main__":
                     with open(fit_distribution_dir.joinpath(f'total-{fit_distribution_number}.pickle'), 'wb') as f:
                         pickle.dump(fit_total_distribution_model, f)
                     del fit_inference_distribution_model
-                    del fit_total_distribution_model 
-                    
+                    del fit_total_distribution_model
+
                 with open(result_path, 'wb') as f:
                     pickle.dump(tmp_results, f)
                 del tmp_results
                 del all_total_times
                 del all_inference_times
 
-            
+
             logger.info(f'-------after loop {loop}-------')
             logger.info(f'already_run: {already_run}')
             logger.info(f'warm_run: {warm_run}')
@@ -681,9 +683,4 @@ if __name__ == "__main__":
             fake_run = False
 
             if already_run == max_run:
-                break 
-            
-
-            
-    
-
+                break

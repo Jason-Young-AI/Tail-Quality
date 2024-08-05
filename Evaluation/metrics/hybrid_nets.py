@@ -120,8 +120,8 @@ class HybridNets(Task):
             acc_ls = result['acc_ls']
             if not validity:
                 stats = (numpy.zeros(0, 10, dtype=bool), numpy.array([]), numpy.array([]), stats[-1])
-                iou_ls = [iou_ls*0 for each_iou_ls in iou_ls]
-                acc_ls = [acc_ls*0 for each_acc_ls in acc_ls]
+                iou_ls = [each_iou_ls*0 for each_iou_ls in iou_ls]
+                acc_ls = [each_acc_ls*0 for each_acc_ls in acc_ls]
             masked_stats.append(stats)
             masked_iou_ls.append(iou_ls)
             masked_acc_ls.append(acc_ls)
@@ -134,7 +134,7 @@ class HybridNets(Task):
             iou_ls[i] = numpy.concatenate(iou_ls[i])
             acc_ls[i] = numpy.concatenate(acc_ls[i])
         iou_score = numpy.mean(iou_ls)
-        acc_score = numpy.mean(acc_ls)
+        # acc_score = numpy.mean(acc_ls)
 
         miou_ls = []
         seg_list = ['road', 'lane']
@@ -151,12 +151,16 @@ class HybridNets(Task):
         names = ['car']
         ap50 = None
         # Compute metrics
-        if len(stats) and stats[0].any():
-            p, r, f1, ap, ap_class = ap_per_class(*stats, names=names)
-            ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
-            mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
-            nt = numpy.bincount(stats[3].astype(numpy.int64), minlength=1)  # number of targets per class
-        else:
-            nt = numpy.zeros(1)
+        # if len(stats) and stats[0].any():
+        #     p, r, f1, ap, ap_class = ap_per_class(*stats, names=names)
+        #     ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
+        #     mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
+        #     nt = numpy.bincount(stats[3].astype(numpy.int64), minlength=1)  # number of targets per class
+        # else:
+        #     nt = numpy.zeros(1)
+
+        p, r, f1, ap, ap_class = ap_per_class(*stats, names=names)
+        ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
+        mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
 
         return mr, map50, iou_score, miou_ls[0], acc_ls[2], iou_ls[2]
