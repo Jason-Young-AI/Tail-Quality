@@ -2,15 +2,13 @@ import io
 import sys
 import numpy
 
-#from pycocotools.coco import COCO
-#from pycocotools.cocoeval import COCOeval
+# from pycocotools.coco import COCO
+# from pycocotools.cocoeval import COCOeval
+from faster_coco_eval import COCO, COCOeval_faster
 
 from . import Task
 from ..utils.io import load_json, load_pickle
 from ..utils.expand import expand_indexed_batches, expand_round_time
-
-from faster_coco_eval import COCO, COCOeval_faster
-#from .fast_coco import COCOeval_opt
 
 
 def coco2numpy(coco_results):
@@ -31,7 +29,7 @@ def coco2numpy(coco_results):
 class DETR(Task):
     @classmethod
     def pre_process(cls, goldens_filepath, results_filepath, alltime_filepath, alltime_type) -> tuple[COCO, numpy.ndarray, list[list[float]]]:
-        goldens = COCO(goldens_filepath)
+        goldens = COCO(str(goldens_filepath))
 
         results = load_json(results_filepath)
 
@@ -67,6 +65,7 @@ class DETR(Task):
         masked_results = numpy.concatenate(masked_results, axis=0)
         results = goldens.loadRes(masked_results)
         coco_eval = COCOeval_faster(goldens, results, iouType='bbox')
+        coco_eval.params.iouThrs = numpy.array([0.5])
         coco_eval.evaluate()
         coco_eval.accumulate()
         coco_eval.summarize()
