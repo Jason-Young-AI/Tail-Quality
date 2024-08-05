@@ -263,7 +263,9 @@ def inference(parameters):
                 else:
                     correct = torch.zeros(pred.shape[0], num_thresholds, dtype=torch.bool)
                 stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), target_class))
-                this_stats.append(stats[-1])
+                this_stat = stats[-1]
+                this_stat = (this_stat[0].numpy(), this_stat[1].numpy(), this_stat[2].numpy(), this_stat[3].numpy, this_stat[4])
+                this_stats.append(this_stat)
 
                 # print(stats)
 
