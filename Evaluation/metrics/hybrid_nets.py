@@ -111,25 +111,24 @@ class HybridNets(Task):
         # Drivable Area Segmentation - (mIoU)
         # Lane Line Detection - (Acc, IoU)
         # each element of inference_results must be a list
-        masked_stats = list()
-        masked_iou_ls = list()
-        masked_acc_ls = list()
-        for result, validity in zip(results, validities):
-            stats = result['stats']
-            iou_ls = result['iou_ls']
-            acc_ls = result['acc_ls']
-            if not validity:
-                stats = (numpy.zeros(0, 10, dtype=bool), numpy.array([]), numpy.array([]), stats[-1])
-                iou_ls = [each_iou_ls*0 for each_iou_ls in iou_ls]
-                acc_ls = [each_acc_ls*0 for each_acc_ls in acc_ls]
-            masked_stats.append(stats)
-            masked_iou_ls.append(iou_ls)
-            masked_acc_ls.append(acc_ls)
 
         ncs = 3
-        stats = masked_stats
-        iou_ls = masked_iou_ls
-        acc_ls = masked_acc_ls
+        stats = []
+        iou_ls = [[] for _ in range(ncs)]
+        acc_ls = [[] for _ in range(ncs)]
+        for result, validity in zip(results, validities):
+            this_stats = result['stats']
+            this_iou_ls = result['iou_ls']
+            this_acc_ls = result['acc_ls']
+            if not validity:
+                this_stats = [(numpy.zeros((0, 10), dtype=bool), numpy.array([]), numpy.array([]), this_stat[-1]) for this_stat in this_stats]
+                this_iou_ls = [each_iou_ls*0 for each_iou_ls in this_iou_ls]
+                this_acc_ls = [each_acc_ls*0 for each_acc_ls in this_acc_ls]
+            stats.extend(this_stats)
+            for i in range(ncs):
+                iou_ls[i].append(this_iou_ls[i])
+                acc_ls[i].append(this_acc_ls[i])
+
         for i in range(ncs):
             iou_ls[i] = numpy.concatenate(iou_ls[i])
             acc_ls[i] = numpy.concatenate(acc_ls[i])
