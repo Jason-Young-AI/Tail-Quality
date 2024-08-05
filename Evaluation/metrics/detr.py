@@ -32,7 +32,7 @@ class DETR(Task):
 
         results, batch_sizes = expand_indexed_batches(results)
 
-        results = coco2numpy(results)
+        results = [coco2numpy(cand_result) for cand_result in results]
 
         alltime = load_pickle(alltime_filepath)[alltime_type]
         multiple_inference_times: list[list[float]] = list()
@@ -48,9 +48,16 @@ class DETR(Task):
         if len(results) == 0:
             return float('NaN')
 
-        results = results[validities]
+        masked_results = list()
+        for result, validity in zip(results, validities):
+            if validity:
+                masked_results.append(result)
 
-        results = goldens.loadRes(results)
+        if len(masked_results) == 0:
+            return float('NaN')
+
+        masked_results = numpy.concatenate(masked_results, axis=0)
+        results = goldens.loadRes(masked_results)
         coco_eval = COCOeval(goldens, results, iouType='bbox')
         coco_eval.evaluate()
         coco_eval.accumulate()
