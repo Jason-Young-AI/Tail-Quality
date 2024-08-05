@@ -2,10 +2,10 @@ import numpy
 
 from . import Task
 from ..utils.io import load_pickle
-from ..utils.expand import expand_indexed_batches, expand_round_time
+from ..utils.expand import expand_indexed_batches, expand_round_time, get_sorted_batch
 
 
-def get_triple_metrics(golden, result):
+def get_triple_metrics(goldens, results):
     topk = 20
 
     predictions = list()
@@ -32,14 +32,17 @@ def get_triple_metrics(golden, result):
     ndcg = dcg / idcg
     ndcg[numpy.isnan(ndcg)] = 0.0
     ndcg = numpy.sum(ndcg)
+    return precision, recall, ndcg
 
 
 class LightGCNFaster(Task):
     @classmethod
     def pre_process(cls, goldens_filepath, results_filepath, alltime_filepath, alltime_type) -> tuple[list[int], list[int], list[list[float]]]:
         goldens = load_pickle(goldens_filepath)
+        goldens = [golden for index, golden in get_sorted_batch(goldens)]
 
         results = load_pickle(results_filepath)
+        results = [result for index, result in get_sorted_batch(results)]
         triple_results = list()
         for golden, result in zip(goldens, results):
             precision, recall, ndcg = get_triple_metrics(golden, result)
@@ -59,12 +62,13 @@ class LightGCNFaster(Task):
         total_precision = 0
         total_recall = 0
         total_ndcg = 0
-        for (precision, recall, ndcg), validity in zip(results, validities):
+        total = 0
+        for golden, (precision, recall, ndcg), validity in zip(goldens, results, validities):
             total_precision += precision if validity else 0
             total_recall += recall if validity else 0
             total_ndcg += ndcg if validity else 0
+            total += len(golden)
 
-        total = sum([len(golden) for golden in goldens])
         precision = total_precision / total
         recall = total_recall / total
         ndcg = total_ndcg / total

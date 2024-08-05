@@ -11,6 +11,9 @@ from .metrics.hybrid_nets  import HybridNets
 from .metrics.mobile_net   import MobileNet
 from .metrics.emotion_flow import EmotionFlow
 
+from .metrics.mobile_net_faster   import MobileNetFaster
+from .metrics.light_gcn_faster    import LightGCNFaster
+
 from .utils.io import save_pickle, load_pickle
 from .tail_quality import tail_quality
 from .calculate_tl import get_tail_latency
@@ -19,9 +22,9 @@ from .calculate_tl import get_tail_latency
 tasks: dict[str, Task] = dict(
     detr         = DETR,
     vicuna       = Vicuna,
-    light_gcn    = LightGCN,
+    light_gcn    = LightGCNFaster,
     hybrid_nets  = HybridNets,
-    mobile_net   = MobileNet,
+    mobile_net   = MobileNetFaster,
     emotion_flow = EmotionFlow,
 )
 
@@ -96,7 +99,7 @@ if __name__ == '__main__':
                 print(f'Now Using Default Multihop Thresholds:')
                 multihop_filepath = pathlib.Path(args.multihop_filepath)
                 multihop_thresholds = numpy.linspace(tls[0], tls[1], 1000, dtype=float).tolist()
-                print(f'Multihop: Min = {tls[0]:.3f} | Max = {tls[0]:.3f} | Hop = 1000')
+                print(f'Multihop: Min = {tls[0]:.3f} | Max = {tls[1]:.3f} | Hop = 1000')
 
     if specific_filepath is None and multihop_filepath is None:
         print(f'Exit!')
