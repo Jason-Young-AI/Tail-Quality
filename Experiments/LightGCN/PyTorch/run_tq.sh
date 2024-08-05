@@ -14,9 +14,6 @@ python run_tq.py \
   --rJSD-threshold 0.02 \
   --max-run 1000000 \
   --dataset-path ${THIS_DATASET_DIR} \
-  --model-path ${THIS_MODEL_DIR}/${THIS_MODEL_FILENAME} \
-  --only-quality \
-  --result-path ../result.json \
-  --golden-path ../golden.json
+  --model-path ${THIS_MODEL_DIR}/${THIS_MODEL_FILENAME}
 
 cd ..
