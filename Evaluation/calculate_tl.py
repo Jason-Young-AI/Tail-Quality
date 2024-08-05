@@ -9,6 +9,9 @@ from .tail_latency import tail_latency
 
 
 def get_tail_latency(alltime, percentiles) -> tuple[int, list[float], list[float]]:
+    all_inference_time = list()
+    all_total_time = list()
+
     total_round = 0
     for round_inference_time, round_total_time in zip(alltime['inference'], alltime['total']):
         total_round += 1
@@ -33,9 +36,6 @@ if __name__ == '__main__':
 
     percentiles = numpy.array(args.percentiles, dtype=float).tolist()
     alltime_filepath = pathlib.Path(args.alltime_filepath)
-
-    all_inference_time = list()
-    all_total_time = list()
 
     alltime = load_pickle(alltime_filepath)
 
