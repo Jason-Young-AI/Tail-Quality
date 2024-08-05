@@ -1,3 +1,4 @@
+import sys
 import numpy
 import pathlib
 import argparse
@@ -10,8 +11,9 @@ from .metrics.hybrid_nets  import HybridNets
 from .metrics.mobile_net   import MobileNet
 from .metrics.emotion_flow import EmotionFlow
 
-from .utils.io import save_pickle
+from .utils.io import save_pickle, load_pickle
 from .tail_quality import tail_quality
+from .calculate_tl import get_tail_latency
 
 
 tasks: dict[str, Task] = dict(
@@ -71,6 +73,36 @@ if __name__ == '__main__':
 
     if len(specific_thresholds) == 0 and len(multihop_thresholds) == 0:
         print(f'Not Specify Any Thresholds!')
+        if args.specific_filepath is None and args.multihop_filepath is None:
+            print(f'Exit!')
+            sys.exit(0)
+        else:
+            alltime = load_pickle(args.alltime_filepath)
+            total_round, inference_tail_latency, total_tail_latency = get_tail_latency(alltime, [0, 100, 90, 95, 99, 99.9])
+            if args.alltime_type == 'inference':
+                tls = inference_tail_latency
+            if args.alltime_type == 'total':
+                tls = total_tail_latency
+
+            if args.specific_filepath is not None:
+                print(f'You Specified Specific Filepath')
+                print(f'Now Using Default Specific Thresholds:')
+                specific_filepath = pathlib.Path(args.specific_filepath)
+                specific_thresholds = tls[2:]
+                print(f'Multihop: 90% \t\t | 95% \t\t | 99% \t\t | 99.9%')
+                print(f'Multihop: {tls[2]:.12f} \t\t | {tls[3]:.12f} \t\t | {tls[4]:.12f} \t\t | {tls[5]:.12f}')
+
+            if args.multihop_filepath is not None:
+                print(f'You Specified Multihop Filepath')
+                print(f'Now Using Default Multihop Thresholds:')
+                multihop_filepath = pathlib.Path(args.multihop_filepath)
+                multihop_thresholds = numpy.linspace(tls[0], tls[1], 1000, dtype=float).tolist()
+                print(f'Multihop: Min \t\t | Max \t\t | Hop')
+                print(f'Multihop: {tls[0]:.12f} \t\t | {tls[1]:.12f} \t\t | {1000}')
+
+    if specific_filepath is None and multihop_filepath is None:
+        print(f'Exit!')
+        sys.exit(0)
     else:
         task = tasks[args.task_name]
         results_filepath = pathlib.Path(args.results_filepath)
