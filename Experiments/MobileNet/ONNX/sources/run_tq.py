@@ -198,7 +198,7 @@ def inference(parameters):
             origin_quality['top5_acc'][batch_id] = batch_acc5 
             if only_quality:
                 overall_result_dic[batch_id] = [(top1.tolist(), top5.tolist()) for top1, top5 in zip(predicted_label_top1_list[-len(outputs[0]):], predicted_label_top5_list[-len(outputs[0]):])]
-                overall_golden_dic[batch_id] = labels_list
+                overall_golden_dic[batch_id] = labels
         del outputs
         del datas
         del labels
@@ -212,10 +212,10 @@ def inference(parameters):
         with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
             json.dump(origin_quality, f, indent=2)
         if only_quality:
-            with open(result_path, 'w') as result_file:
-                json.dump(overall_result_dic, result_file, indent=2)
-            with open(golden_path, 'w') as golden_file:
-                json.dump(overall_golden_dic, golden_file, indent=2)
+            with open(result_path, 'wb') as result_file:
+                pickle.dump(overall_result_dic, result_file)
+            with open(golden_path, 'wb') as golden_file:
+                pickle.dump(overall_golden_dic, golden_file)
 
     del predicted_label_top1_list 
     del predicted_label_top5_list 

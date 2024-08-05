@@ -168,7 +168,7 @@ def inference(parameters):
                     golden_label_list.append(int(label))
                 if only_quality:
                     overall_result_dic[batch_id] = [([top1], top5) for top1, top5 in zip(predicted_label_top1_list[-len(predicted_labels):], predicted_label_top5_list[-len(predicted_labels):])]
-                    overall_golden_dic[batch_id] = golden_label_list
+                    overall_golden_dic[batch_id] = [int(label) for label in label_batch]
         except tf.errors.OutOfRangeError:
             break
         a = time.perf_counter()
@@ -194,10 +194,10 @@ def inference(parameters):
         with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
             json.dump(main_results, f, indent=2)
         if only_quality:
-            with open(result_path, 'w') as result_file:
-                json.dump(overall_result_dic, result_file, indent=2)
-            with open(golden_path, 'w') as golden_file:
-                json.dump(overall_golden_dic, golden_file, indent=2)
+            with open(result_path, 'wb') as result_file:
+                pickle.dump(overall_result_dic, result_file)
+            with open(golden_path, 'wb') as golden_file:
+                pickle.dump(overall_golden_dic, golden_file)
 
     return  tmp_inference_dic, tmp_total_dic
 
