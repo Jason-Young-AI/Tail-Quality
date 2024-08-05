@@ -34,9 +34,6 @@ class LightGCN(Task):
             return float('NaN')
 
         topk = 20
-        total_precision = 0
-        total_recall = 0
-        total_ndcg = 0
 
         predictions = list()
         max_predictions = list()
@@ -61,8 +58,9 @@ class LightGCN(Task):
         idcg[idcg == 0.0] = 1.0
         ndcg = dcg / idcg
         ndcg[numpy.isnan(ndcg)] = 0.0
+        ndcg = numpy.sum(ndcg)
 
-        precision = total_precision / len(goldens)
-        recall = total_recall / len(goldens)
-        ndcg = total_ndcg / len(goldens)
+        precision = precision / len(goldens)
+        recall = recall / len(goldens)
+        ndcg = ndcg / len(goldens)
         return precision, recall, ndcg
