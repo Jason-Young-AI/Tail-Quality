@@ -205,11 +205,13 @@ def inference(parameters):
     only_quality = parameters['only_quality']
     golden_path = parameters['golden_path']
     result_path = parameters['result_path']
+    others_path = parameters['others_path']
     assert len(img_paths) == len(img_ids), "Fatal Error!"
 
     tmp_inference_dic = dict()
     tmp_total_dic = dict()
     overall_result_dic = dict()
+    overall_others_dic = dict()
     all_results = list()
     a = time.perf_counter()
     for batch_id, (img_path, img_id) in tqdm(enumerate(zip(img_paths, img_ids), start=1), ascii=True, total=len(img_ids)):
@@ -253,6 +255,10 @@ def inference(parameters):
             all_results.append(add_other(results, image_sizes, images.shape[1:-1].as_list()))
             if only_quality:
                 overall_result_dic[batch_id] = results
+                overall_others_dic[batch_id] = dict(
+                    image_sizes = image_sizes,
+                    batch_image_shape = images.shape[1:-1].as_list(),
+                )
 
         # logger.info('total_time, inference_time: ', total_time, inference_time)
         a = time.perf_counter()
@@ -274,6 +280,8 @@ def inference(parameters):
                 json.dump(overall_result_dic, result_file, indent=2)
             annotations_file_url = 'https://huggingface.co/datasets/AIJasonYoung/Tail-Quality-Assets/resolve/main/DETR/coco_2017_annotations.json'
             urllib.request.urlretrieve(annotations_file_url, golden_path)
+            with open(others_path, 'w') as others_file:
+                json.dump(overall_others_dic, others_file, indent=2)
 
     return  tmp_inference_dic, tmp_total_dic
 
@@ -310,10 +318,16 @@ if __name__ == "__main__":
     parser.add_argument('--model-path', type=str, required=True)
 
     parser.add_argument('--only-quality', action='store_true')
-    parser.add_argument('--golden-path', type=str)
-    parser.add_argument('--result-path', type=str)
+    parser.add_argument('--golden-path', type=str, default=None)
+    parser.add_argument('--result-path', type=str, default=None)
+    parser.add_argument('--others-path', type=str, default=None)
 
     args = parser.parse_args()
+
+    if args.only_quality:
+        assert args.golden_path is not None
+        assert args.result_path is not None
+        assert args.others_path is not None
 
     model_path = Path(args.model_path)
     assert model_path.is_file(), f"Model Weights path {model_path.name} does not exist."
@@ -376,6 +390,7 @@ if __name__ == "__main__":
             'only_quality': args.only_quality,
             'golden_path': args.golden_path,
             'result_path': args.result_path,
+            'others_path': args.others_path,
         }
 
         logger.info(f'-------before loop {loop}-------')

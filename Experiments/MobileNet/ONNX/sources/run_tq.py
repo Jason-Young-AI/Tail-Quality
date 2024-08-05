@@ -276,6 +276,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    if args.only_quality:
+        assert args.golden_path is not None
+        assert args.result_path is not None
+        assert args.others_path is not None
+
     model_path = Path(args.model_path)
     assert model_path.is_file(), f"Model Weights path {model_path.absolute()} does not exist."
 

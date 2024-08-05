@@ -234,10 +234,16 @@ if __name__ == "__main__":
     parser.add_argument('--workers', default=8, type=int)
 
     parser.add_argument('--only-quality', action='store_true')
-    parser.add_argument('--golden-path', type=str)
-    parser.add_argument('--result-path', type=str)
+    parser.add_argument('--golden-path', type=str, default=None)
+    parser.add_argument('--result-path', type=str, default=None)
+    parser.add_argument('--others-path', type=str, default=None)
 
     args = parser.parse_args()
+
+    if args.only_quality:
+        assert args.golden_path is not None
+        assert args.result_path is not None
+        assert args.others_path is not None
 
     model_path = Path(args.model_path)
     assert model_path.is_file(), f"Model Weights path {model_path.absolute()} does not exist."

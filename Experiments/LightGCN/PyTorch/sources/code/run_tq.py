@@ -281,6 +281,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    if args.only_quality:
+        assert args.golden_path is not None
+        assert args.result_path is not None
 
     results_basepath = pathlib.Path(args.results_basepath)
     warm_run = args.warm_run 

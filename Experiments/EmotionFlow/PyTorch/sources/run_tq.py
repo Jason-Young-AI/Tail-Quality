@@ -445,11 +445,14 @@ if __name__ == '__main__':
     parser.add_argument('--model-path', type=str, required=True)
 
     parser.add_argument('--only-quality', action='store_true')
-    parser.add_argument('--golden-path', type=str)
-    parser.add_argument('--result-path', type=str)
+    parser.add_argument('--golden-path', type=str, default=None)
+    parser.add_argument('--result-path', type=str, default=None)
 
     args = parser.parse_args()
 
+    if args.only_quality:
+        assert args.golden_path is not None
+        assert args.result_path is not None
 
     results_basepath = pathlib.Path(args.results_basepath)
     warm_run = args.warm_run 
