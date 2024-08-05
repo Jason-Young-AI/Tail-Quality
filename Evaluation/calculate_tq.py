@@ -89,16 +89,14 @@ if __name__ == '__main__':
                 print(f'Now Using Default Specific Thresholds:')
                 specific_filepath = pathlib.Path(args.specific_filepath)
                 specific_thresholds = tls[2:]
-                print(f'Multihop: 90% \t\t | 95% \t\t | 99% \t\t | 99.9%')
-                print(f'Multihop: {tls[2]:.12f} | {tls[3]:.12f} | {tls[4]:.12f} | {tls[5]:.12f}')
+                print(f'Multihop: 90% = {tls[2]:.3f} | 95% = {tls[3]:.3f} | 99% = {tls[4]:.3f} | 99.9% = {tls[5]:.3f}')
 
             if args.multihop_filepath is not None:
                 print(f'You Specified Multihop Filepath')
                 print(f'Now Using Default Multihop Thresholds:')
                 multihop_filepath = pathlib.Path(args.multihop_filepath)
                 multihop_thresholds = numpy.linspace(tls[0], tls[1], 1000, dtype=float).tolist()
-                print(f'Multihop: Min \t\t | Max \t\t | Hop')
-                print(f'Multihop: {tls[0]:.12f} | {tls[1]:.12f} | {1000}')
+                print(f'Multihop: Min = {tls[0]:.3f} | Max = {tls[0]:.3f} | Hop = 1000')
 
     if specific_filepath is None and multihop_filepath is None:
         print(f'Exit!')
