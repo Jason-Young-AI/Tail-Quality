@@ -167,7 +167,7 @@ def inference(parameters):
                 for label in label_batch:
                     golden_label_list.append(int(label))
                 if only_quality:
-                    overall_result_dic[batch_id] = (predicted_label_top1_list[-batch_size:], predicted_label_top5_list[-batch_size:])
+                    overall_result_dic[batch_id] = [([top1], top5) for top1, top5 in zip(predicted_label_top1_list[-len(predicted_labels):], predicted_label_top5_list[-len(predicted_labels):])]
                     overall_golden_dic[batch_id] = golden_label_list
         except tf.errors.OutOfRangeError:
             break

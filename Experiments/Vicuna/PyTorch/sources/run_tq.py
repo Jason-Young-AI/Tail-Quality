@@ -293,12 +293,13 @@ def inference(parameters):
             tmp_total_dic[overall_batch_id] = float(total_time)
 
             if fake_run:
-                overall_result_dic[overall_batch_id] = [answer[-1] for answer in answers]
-                overall_golden_dic[overall_batch_id] = answer_batches[batch_id]
-                overall_others_dic[overall_batch_id] = dict(
-                    token_lengths = token_length_batches[batch_id],
-                    question_numbers = question_number_batches[batch_id],
-                )
+                if only_quality:
+                    overall_result_dic[overall_batch_id] = [answer[-1] for answer in answers]
+                    overall_golden_dic[overall_batch_id] = answer_batches[batch_id]
+                    overall_others_dic[overall_batch_id] = dict(
+                        token_lengths = token_length_batches[batch_id],
+                        question_numbers = question_number_batches[batch_id],
+                    )
 
             # logger.info('total_time, inference_time: ', total_time, inference_time)
             a = time.perf_counter()

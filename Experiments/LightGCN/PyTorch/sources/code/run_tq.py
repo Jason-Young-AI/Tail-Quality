@@ -229,10 +229,10 @@ def inference(params):
         pre_results.append(test_one_batch(x))
     if fake_run:
         if only_quality:
-            with open(result_path, 'w') as result_file:
-                json.dump(overall_result_dic, result_file, indent=2)
-            with open(golden_path, 'w') as golden_file:
-                json.dump(overall_golden_dic, golden_file, indent=2)
+            with open(result_path, 'wb') as result_file:
+                pickle.dump(overall_result_dic, result_file)
+            with open(golden_path, 'wb') as golden_file:
+                pickle.dump(overall_golden_dic, golden_file)
     return  tmp_inference_dic, tmp_total_dic
     
     # for result in pre_results: 

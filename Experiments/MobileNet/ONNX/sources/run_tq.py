@@ -175,7 +175,7 @@ def inference(parameters):
                 # profiler.set_state('stop') 
                 fake1 = mx.nd.argmax(output).asnumpy() 
                 fake2 = mx.nd.topk(output).asnumpy()
-                # profiler.set_state('run')  
+                # profiler.set_state('run')
                 postprocess_start = time.perf_counter() + c - b  
             predicted_label_top1_list.append(mx.nd.argmax(output).asnumpy())
             predicted_label_top5_list.append(mx.nd.topk(output, k=5).asnumpy())
@@ -193,11 +193,11 @@ def inference(parameters):
         if fake_run:
             for label in labels[0]:
                 labels_list.append(label)
-            batch_acc1, batch_acc5 = accuracy(predicted_label_top5_list[-batch_size:], labels_list[-batch_size:])
+            batch_acc1, batch_acc5 = accuracy(predicted_label_top5_list[-len(outputs[0]):], labels_list[-len(outputs[0]):])
             origin_quality['top1_acc'][batch_id] = batch_acc1 
             origin_quality['top5_acc'][batch_id] = batch_acc5 
             if only_quality:
-                overall_result_dic[batch_id] = ([top1.tolist() for top1 in predicted_label_top1_list[-batch_size:]], [top5.tolist() for top5 in predicted_label_top5_list[-batch_size:]])
+                overall_result_dic[batch_id] = [(top1.tolist(), top5.tolist()) for top1, top5 in zip(predicted_label_top1_list[-len(outputs[0]):], predicted_label_top5_list[-len(outputs[0]):])]
                 overall_golden_dic[batch_id] = labels_list
         del outputs
         del datas

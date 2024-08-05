@@ -297,8 +297,8 @@ def inference(parameters):
             for i in range(ncs):
                 iou_ls[i].append(iou.T[i].detach().cpu().numpy())
                 acc_ls[i].append(acc.T[i].detach().cpu().numpy())
-            this_iouls = [each_iou_ls[-1] for each_iou_ls in iou_ls]
-            this_accls = [each_acc_ls[-1] for each_acc_ls in acc_ls]
+            this_iou_ls = [each_iou_ls[-1] for each_iou_ls in iou_ls]
+            this_acc_ls = [each_acc_ls[-1] for each_acc_ls in acc_ls]
 
             cls_loss = cls_loss.mean()
             reg_loss = reg_loss.mean()
@@ -314,8 +314,8 @@ def inference(parameters):
             if only_quality:
                 overall_result_dic[batch_id] = dict(
                     stats = this_stats,
-                    iouls = this_iouls,
-                    accls = this_accls,
+                    iou_ls = this_iou_ls,
+                    acc_ls = this_acc_ls,
                 )
 
         # logger.info('total_time, inference_time: ', total_time, inference_time)

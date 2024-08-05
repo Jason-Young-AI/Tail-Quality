@@ -188,11 +188,11 @@ def inference(parameters):
         if fake_run:
             for target in targets:
                 targets_list.append(target)
-            batch_acc1, batch_acc5 = accuracy(predicted_label_top5_list[-batch_size:], targets[-batch_size:])
+            batch_acc1, batch_acc5 = accuracy(predicted_label_top5_list[-len(outputs):], targets[-len(outputs):])
             origin_quality['top1_acc'][batch_id] = batch_acc1 
             origin_quality['top5_acc'][batch_id] = batch_acc5 
             if only_quality:
-                overall_result_dic[batch_id] = ([top1.tolist() for top1 in predicted_label_top1_list[-batch_size:]], [top5.tolist() for top5 in predicted_label_top5_list[-batch_size:]])
+                overall_result_dic[batch_id] = [(top1.tolist(), top5.tolist()) for top1, top5 in zip(predicted_label_top1_list[-len(outputs):], predicted_label_top5_list[-len(outputs):])]
                 overall_golden_dic[batch_id] = targets_list
 
         a = time.perf_counter()

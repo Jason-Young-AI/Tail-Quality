@@ -6,7 +6,7 @@ import multiprocessing
 from typing import Any, Callable
 
 
-def tail_quality(quality_calculation_function: Callable[[tuple[Any, list[Any], list[numpy.ndarray]]], Any], inference_goldens: Any, inference_results: list[Any], multiple_inference_times: list[list[float]], thresholds: list[float], worker_number: int) -> list[list[Any]]:
+def tail_quality(quality_calculation_function: Callable[[tuple[Any, Any, list[numpy.ndarray]]], Any], inference_goldens: Any, inference_results: Any, multiple_inference_times: list[list[float]], thresholds: list[float], worker_number: int) -> list[list[Any]]:
     # the length (s) of each element of `multiple_inference_times` must be equal to the length (s) of `inference_results`.
     #
     # the length of `inference_results` is (s).
@@ -20,7 +20,7 @@ def tail_quality(quality_calculation_function: Callable[[tuple[Any, list[Any], l
 
     qualities_at_thresholds = list()
 
-    inference_validities_at_thresholds = list()
+    inference_validities_at_thresholds: list[list[numpy.ndarray]] = list()
     # [
     #   [
     #     numpy.array( ( len(s) ), dtype=numpy.bool),
@@ -29,7 +29,7 @@ def tail_quality(quality_calculation_function: Callable[[tuple[Any, list[Any], l
     #   ...
     # ] (length = m)
     for threshold in thresholds:
-        inference_validities_at_threshold = list()
+        inference_validities_at_threshold: list[numpy.ndarray] = list()
         for inference_times in multiple_inference_times:
             inference_validities_at_threshold.append(numpy.array([inference_time < threshold for inference_time in inference_times], dtype=numpy.bool))
         inference_validities_at_thresholds.append(inference_validities_at_threshold)
