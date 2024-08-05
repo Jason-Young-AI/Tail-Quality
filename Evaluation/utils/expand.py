@@ -23,3 +23,8 @@ def expand_round_time(round_time: dict[str, float], batch_sizes: list[int]) -> l
     for (index, batch_time), batch_size in zip(round_time, batch_sizes):
         expanded.extend([batch_time for _ in range(batch_size)])
     return expanded
+
+
+def get_sorted_batch(indexed_batches: dict[str, Any]) -> list[Any]:
+    indexed_batches = sorted([(int(index), batch) for index, batch in indexed_batches.items()], key=lambda x: x[0])
+    return indexed_batches
