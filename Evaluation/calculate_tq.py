@@ -72,7 +72,9 @@ if __name__ == '__main__':
         results_filepath = pathlib.Path(args.results_filepath)
         goldens_filepath = pathlib.Path(args.goldens_filepath)
         alltime_filepath = pathlib.Path(args.alltime_filepath)
+        print(f'Preprocessing All Goldens, Results, and Inference Times ... ')
         goldens, results, multiple_inference_times = task.pre_process(goldens_filepath, results_filepath, alltime_filepath, args.alltime_type)
+        print(f'Done')
 
         print(f'Calculating Specific Tail Qualities ... ')
         specific_tq = tail_quality(task.get_metrics, goldens, results, multiple_inference_times, specific_thresholds, args.worker_number)

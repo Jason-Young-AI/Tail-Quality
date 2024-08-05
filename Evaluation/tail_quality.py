@@ -28,11 +28,13 @@ def tail_quality(quality_calculation_function: Callable[[tuple[Any, Any, list[nu
     #   ] (length = n),
     #   ...
     # ] (length = m)
+    print(f'Checking Validity')
     for threshold in thresholds:
         inference_validities_at_threshold: list[numpy.ndarray] = list()
         for inference_times in multiple_inference_times:
-            inference_validities_at_threshold.append(numpy.array([inference_time < threshold for inference_time in inference_times], dtype=numpy.bool))
+            inference_validities_at_threshold.append(numpy.array([inference_time < threshold for inference_time in inference_times], dtype=bool))
         inference_validities_at_thresholds.append(inference_validities_at_threshold)
+    print(f'Done')
 
     for inference_validities_at_threshold, threshold in zip(inference_validities_at_thresholds, thresholds):
         parameters = ((inference_goldens, inference_results, inference_validities) for inference_validities in inference_validities_at_threshold)
@@ -41,6 +43,7 @@ def tail_quality(quality_calculation_function: Callable[[tuple[Any, Any, list[nu
             with tqdm.tqdm(total=len(inference_validities_at_threshold), desc=f'Calculating Quality @ Threshold={threshold}') as progress_bar:
                 for index, quality_at_threshold in enumerate(pool.imap_unordered(quality_calculation_function, parameters), start=1):
                     qualities_at_threshold.append(quality_at_threshold)
+                    progress_bar.update(1)
         qualities_at_thresholds.append(qualities_at_threshold)
 
     return qualities_at_thresholds

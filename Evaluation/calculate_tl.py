@@ -3,7 +3,7 @@ import pickle
 import pathlib
 import argparse
 
-from tail_latency import tail_latency
+from .tail_latency import tail_latency
 
 
 if __name__ == '__main__':

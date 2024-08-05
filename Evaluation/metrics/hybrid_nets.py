@@ -1,7 +1,7 @@
 import numpy
 
 from . import Task
-from ..utils.io import load_json, load_pickle
+from ..utils.io import load_pickle
 from ..utils.expand import expand_indexed_batches, expand_round_time
 
 
