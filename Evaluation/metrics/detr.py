@@ -1,3 +1,5 @@
+import io
+import sys
 import numpy
 
 from pycocotools.coco import COCO
@@ -56,10 +58,15 @@ class DETR(Task):
         if len(masked_results) == 0:
             return float('NaN')
 
+        original_stdout = sys.stdout
+        sys.stdout = io.StringIO()
+
         masked_results = numpy.concatenate(masked_results, axis=0)
         results = goldens.loadRes(masked_results)
         coco_eval = COCOeval(goldens, results, iouType='bbox')
         coco_eval.evaluate()
         coco_eval.accumulate()
         coco_eval.summarize()
+
+        sys.stdout = original_stdout
         return coco_eval.stats.tolist()
