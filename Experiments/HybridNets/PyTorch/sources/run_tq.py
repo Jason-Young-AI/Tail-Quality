@@ -142,9 +142,9 @@ def inference(parameters):
     params = parameters['params']
     seg_mode = parameters['seg_mode']
 
-    only_quality = params['only_quality']
-    golden_path = params['golden_path']
-    result_path = params['result_path']
+    only_quality = parameters['only_quality']
+    golden_path = parameters['golden_path']
+    result_path = parameters['result_path']
 
     overall_result_dic = dict()
     overall_golden_dic = dict()
