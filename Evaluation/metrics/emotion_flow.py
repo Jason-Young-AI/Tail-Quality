@@ -37,7 +37,7 @@ class EmotionFlow(Task):
         invalid_result = min(goldens) - 1
 
         masked_results = list()
-        for golden, result, validity in zip(goldens, results, validities):
+        for result, validity in zip(results, validities):
             result = result if validity else invalid_result
             masked_results.append(result)
-        return f1_score(golden, masked_results)
+        return f1_score(goldens, masked_results, average='weighted')
