@@ -49,6 +49,8 @@ if __name__ == '__main__':
     if len(specific_thresholds) != 0:
         assert args.specific_filepath is not None
         specific_filepath = pathlib.Path(args.specific_filepath)
+    else:
+        specific_filepath = None
 
     multihop_thresholds_min = args.multihop_thresholds_min
     multihop_thresholds_max = args.multihop_thresholds_max
@@ -64,6 +66,8 @@ if __name__ == '__main__':
     if len(multihop_thresholds) != 0:
         assert args.multihop_filepath is not None
         multihop_filepath = pathlib.Path(args.multihop_filepath)
+    else:
+        multihop_filepath = None
 
     if len(specific_thresholds) == 0 and len(multihop_thresholds) == 0:
         print(f'Not Specify Any Thresholds!')
@@ -76,14 +80,16 @@ if __name__ == '__main__':
         goldens, results, multiple_inference_times = task.pre_process(goldens_filepath, results_filepath, alltime_filepath, args.alltime_type)
         print(f'Done')
 
-        print(f'Calculating Specific Tail Qualities ... ')
-        specific_tq = tail_quality(task.get_metrics, goldens, results, multiple_inference_times, specific_thresholds, args.worker_number)
-        specific_thres2tq = [(thres, tq) for thres, tq in zip(specific_thresholds, specific_tq)]
-        save_pickle(specific_thres2tq, specific_filepath)
-        print(f'Done')
+        if specific_filepath is not None:
+            print(f'Calculating Specific Tail Qualities ... ')
+            specific_tq = tail_quality(task.get_metrics, goldens, results, multiple_inference_times, specific_thresholds, args.worker_number)
+            specific_thres2tq = [(thres, tq) for thres, tq in zip(specific_thresholds, specific_tq)]
+            save_pickle(specific_thres2tq, specific_filepath)
+            print(f'Done')
 
-        print(f'Calculating Multihop Tail Qualities ... ')
-        multihop_tq = tail_quality(task.get_metrics, goldens, results, multiple_inference_times, multihop_thresholds, args.worker_number)
-        multihop_thres2tq = [(thres, tq) for thres, tq in zip(multihop_thresholds, multihop_tq)]
-        save_pickle(multihop_thres2tq, multihop_filepath)
-        print(f'Done')
+        if multihop_filepath is not None:
+            print(f'Calculating Multihop Tail Qualities ... ')
+            multihop_tq = tail_quality(task.get_metrics, goldens, results, multiple_inference_times, multihop_thresholds, args.worker_number)
+            multihop_thres2tq = [(thres, tq) for thres, tq in zip(multihop_thresholds, multihop_tq)]
+            save_pickle(multihop_thres2tq, multihop_filepath)
+            print(f'Done')
