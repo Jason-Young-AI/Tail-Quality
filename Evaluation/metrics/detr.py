@@ -2,12 +2,15 @@ import io
 import sys
 import numpy
 
-from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
+#from pycocotools.coco import COCO
+#from pycocotools.cocoeval import COCOeval
 
 from . import Task
 from ..utils.io import load_json, load_pickle
 from ..utils.expand import expand_indexed_batches, expand_round_time
+
+from faster_coco_eval import COCO, COCOeval_faster
+#from .fast_coco import COCOeval_opt
 
 
 def coco2numpy(coco_results):
@@ -58,15 +61,15 @@ class DETR(Task):
         if len(masked_results) == 0:
             return float('NaN')
 
-        original_stdout = sys.stdout
-        sys.stdout = io.StringIO()
+        #original_stdout = sys.stdout
+        #sys.stdout = io.StringIO()
 
         masked_results = numpy.concatenate(masked_results, axis=0)
         results = goldens.loadRes(masked_results)
-        coco_eval = COCOeval(goldens, results, iouType='bbox')
+        coco_eval = COCOeval_faster(goldens, results, iouType='bbox')
         coco_eval.evaluate()
         coco_eval.accumulate()
         coco_eval.summarize()
 
-        sys.stdout = original_stdout
+        #sys.stdout = original_stdout
         return coco_eval.stats.tolist()
