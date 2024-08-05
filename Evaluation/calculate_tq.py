@@ -35,7 +35,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-l', '--multihop-thresholds-min', type=float, default=None)
     parser.add_argument('-r', '--multihop-thresholds-max', type=float, default=None)
-    parser.add_argument('-h', '--multihop-thresholds-hop', type=float, default=None)
+    parser.add_argument('-o', '--multihop-thresholds-hop', type=float, default=None)
     parser.add_argument('--multihop-filepath', type=str, default=None)
 
     parser.add_argument('--alltime-type', type=str, choices=['inference', 'total'], required=True)

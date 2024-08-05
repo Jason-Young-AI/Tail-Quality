@@ -89,7 +89,7 @@ def ap_per_class(tp, conf, pred_cls, target_cls, names=[]):
     return p[:, i], r[:, i], f1[:, i], ap, unique_classes.astype('int32')
 
 
-class HybirdNets(Task):
+class HybridNets(Task):
     @classmethod
     def pre_process(cls, goldens_filepath, results_filepath, alltime_filepath, alltime_type) -> tuple[None, list[str], list[list[float]]]:
         results = load_pickle(results_filepath)
