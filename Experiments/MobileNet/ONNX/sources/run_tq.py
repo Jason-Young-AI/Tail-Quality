@@ -197,7 +197,7 @@ def inference(parameters):
             origin_quality['top1_acc'][batch_id] = batch_acc1 
             origin_quality['top5_acc'][batch_id] = batch_acc5 
             if only_quality:
-                overall_result_dic[batch_id] = [(top1.tolist(), top5.tolist()) for top1, top5 in zip(predicted_label_top1_list[-len(outputs[0]):], predicted_label_top5_list[-len(outputs[0]):])]
+                overall_result_dic[batch_id] = [([top1.tolist()], top5.tolist()) for top1, top5 in zip(predicted_label_top1_list[-len(outputs[0]):], predicted_label_top5_list[-len(outputs[0]):])]
                 overall_golden_dic[batch_id] = labels
         del outputs
         del datas
