@@ -98,8 +98,8 @@ if __name__ == '__main__':
                 print(f'You Specified Multihop Filepath')
                 print(f'Now Using Default Multihop Thresholds:')
                 multihop_filepath = pathlib.Path(args.multihop_filepath)
-                multihop_thresholds = numpy.linspace(tls[0], tls[1], 1000, dtype=float).tolist()
-                print(f'Multihop: Min = {tls[0]:.3f} | Max = {tls[1]:.3f} | Hop = 1000')
+                multihop_thresholds = numpy.linspace(tls[0], tls[1], 100, dtype=float).tolist()
+                print(f'Multihop: Min = {tls[0]:.3f} | Max = {tls[1]:.3f} | Hop = 100')
 
     if specific_filepath is None and multihop_filepath is None:
         print(f'Exit!')
