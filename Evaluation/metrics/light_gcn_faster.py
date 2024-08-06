@@ -49,8 +49,12 @@ class LightGCNFaster(Task):
             triple_results.append((precision, recall, ndcg))
 
         alltime = load_pickle(alltime_filepath)[alltime_type]
+        multiple_inference_times: list[list[float]] = list()
+        for round_time in alltime:
+            round_time = [batch_time for index, batch_time in get_sorted_batch(round_time)]
+            multiple_inference_times.append(round_time)
 
-        return goldens, triple_results, alltime
+        return goldens, triple_results, multiple_inference_times
 
 
     @classmethod

@@ -24,8 +24,12 @@ class MobileNetFaster(Task):
             top_results.append((top1_right/len(golden), top5_right/len(golden)))
 
         alltime = load_pickle(alltime_filepath)[alltime_type]
+        multiple_inference_times: list[list[float]] = list()
+        for round_time in alltime:
+            round_time = [batch_time for index, batch_time in get_sorted_batch(round_time)]
+            multiple_inference_times.append(round_time)
 
-        return None, top_results, alltime
+        return None, top_results, multiple_inference_times
 
     @classmethod
     def calculate_metrics(cls, goldens: None, results: list[tuple[float, float]], validities: numpy.ndarray) -> tuple[float, float]:
