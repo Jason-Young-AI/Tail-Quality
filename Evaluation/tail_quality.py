@@ -32,7 +32,7 @@ def tail_quality(quality_calculation_function: Callable[[tuple[Any, Any, list[nu
     for threshold in thresholds:
         inference_validities_at_threshold: list[numpy.ndarray] = list()
         for inference_times in multiple_inference_times:
-            inference_validities_at_threshold.append(numpy.array([inference_time < threshold for inference_time in inference_times], dtype=bool))
+            inference_validities_at_threshold.append(numpy.array([inference_time <= threshold for inference_time in inference_times], dtype=bool))
         inference_validities_at_thresholds.append(inference_validities_at_threshold)
     print(f'Done')
 
