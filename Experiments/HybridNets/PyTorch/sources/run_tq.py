@@ -431,6 +431,7 @@ if __name__ == "__main__":
     parser.add_argument('--warm-run', type=int, default=1)
     parser.add_argument('--fake-run', type=bool, default=True) # To avoid the outliers processed during the first inference
     parser.add_argument('--window-size', type=int, default=5)
+    parser.add_argument('--second--window-size', type=int, default=3)
     parser.add_argument('--fit-run-number', type=int, default=2)
     parser.add_argument('--rJSD-threshold', type=float, default=0.05)
     parser.add_argument('--max-run', type=int, default=0)
@@ -473,6 +474,7 @@ if __name__ == "__main__":
     min_run = args.min_run
     warm_run = args.warm_run
     window_size = args.window_size
+    second_window_size = args.second_window_size
     fit_run_number = args.fit_run_number
     rJSD_threshold = args.rJSD_threshold
     fake_run = args.fake_run
@@ -480,6 +482,7 @@ if __name__ == "__main__":
 
     result_path = results_basepath.joinpath('All_Times.pickle')
     rjsds_path = results_basepath.joinpath('All_rJSDs.pickle')
+    second_rjsds_path = results_basepath.joinpath('All_rJSDs_2nd.pickle')
     fit_distribution_dir = results_basepath.joinpath('All_PDFs')
     if not fit_distribution_dir.exists():
         fit_distribution_dir.mkdir(parents=True, exist_ok=True)
@@ -613,12 +616,15 @@ if __name__ == "__main__":
 
                 logger.info(f'(already_run - warm_run) % fit_run_number == {(already_run - warm_run) % fit_run_number}')
                 logger.info(f"fit_distribution_number % window_size == {fit_distribution_number % window_size}")
+                logger.info(f"fit_distribution_number % second_window_size == {fit_distribution_number % second_window_size}")
                 if already_run > warm_run and (already_run - warm_run) % fit_run_number == 0:
                     fit_inference_distribution_model = fit(all_inference_times)
                     fit_total_distribution_model = fit(all_total_times)
-                    if fit_distribution_number % window_size == 0 and fit_distribution_number != 0:
+                    if ((fit_distribution_number % window_size == 0) or (fit_distribution_number % second_window_size == 0)) and fit_distribution_number != 0:
                         inference_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'inference'], key=lambda x: int(x.stem.split('-')[-1]))
                         total_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'total'], key=lambda x: int(x.stem.split('-')[-1]))
+
+                        # window_size
                         fit_inference_distribution_models = list()
                         fit_total_distribution_models = list()
                         for inference_model_path in inference_model_paths[-window_size:]:
@@ -630,6 +636,19 @@ if __name__ == "__main__":
                                 distribution_model = pickle.load(f)
                                 fit_total_distribution_models.append(distribution_model)
 
+                        # second_window_size
+                        second_fit_inference_distribution_models = list()
+                        second_fit_total_distribution_models = list()
+                        for inference_model_path in inference_model_paths[-second_window_size:]:
+                            with open(inference_model_path, 'rb') as f:
+                                distribution_model = pickle.load(f)
+                                second_fit_inference_distribution_models.append(distribution_model)
+                        for total_model_path in total_model_paths[-second_window_size:]:
+                            with open(total_model_path, 'rb') as f:
+                                distribution_model = pickle.load(f)
+                                second_fit_total_distribution_models.append(distribution_model)
+
+                        # window_size
                         logger.info(f'start_check_fit')
                         inference_rjsd = check_fit_dynamic(fit_inference_distribution_models, fit_inference_distribution_model, all_inference_times, window_size)
                         total_rjsd = check_fit_dynamic(fit_total_distribution_models, fit_total_distribution_model, all_total_times, window_size)
@@ -637,12 +656,27 @@ if __name__ == "__main__":
                         del fit_inference_distribution_models
                         del fit_total_distribution_models
 
+                        # second_window_size
+                        logger.info(f'second_start_check_fit')
+                        second_inference_rjsd = check_fit_dynamic(second_fit_inference_distribution_models, fit_inference_distribution_model, all_inference_times, second_window_size)
+                        second_total_rjsd = check_fit_dynamic(second_fit_total_distribution_models, fit_total_distribution_model, all_total_times, second_window_size)
+                        logger.info(f'second_end_check_fit')
+                        del second_fit_inference_distribution_models
+                        del second_fit_total_distribution_models
+
                         logger.info(f'inference_rjsd is {inference_rjsd} / total_rjsd is {total_rjsd}')
-                        sucess_flag = True if inference_rjsd <= rJSD_threshold and total_rjsd <= rJSD_threshold else False
+                        logger.info(f'second_inference_rjsd is {second_inference_rjsd} / second_total_rjsd is {second_total_rjsd}')
+                        sucess_flag = True if inference_rjsd <= rJSD_threshold and total_rjsd <= rJSD_threshold and second_inference_rjsd <= rJSD_threshold and second_total_rjsd <= rJSD_threshold else False
                         if inference_rjsd <= rJSD_threshold:
                             logger.info('inference_times has fitted')
                         if total_rjsd <= rJSD_threshold:
                             logger.info('total_times has fitted')
+                        if second_inference_rjsd <= rJSD_threshold:
+                            logger.info('second: inference_times has fitted')
+                        if second_total_rjsd <= rJSD_threshold:
+                            logger.info('second: total_times has fitted')
+
+                        # window_size
                         logger.info(f'start_draw_rjsds')
                         if rjsds_path.exists():
                             with open(rjsds_path, 'rb') as f:
@@ -663,6 +697,28 @@ if __name__ == "__main__":
                         draw_rjsds(tmp_rjsds, results_basepath)
                         del tmp_rjsds
                         logger.info(f'end_draw_rjsds')
+
+                        # second_window_size
+                        logger.info(f'second: start_draw_rjsds')
+                        if second_rjsds_path.exists():
+                            with open(second_rjsds_path, 'rb') as f:
+                                second_rjsds = pickle.load(f)
+                                tmp_second_rjsds = second_rjsds.copy()
+                                del second_rjsds
+                            tmp_second_rjsds['inference'].append(second_inference_rjsd)
+                            tmp_second_rjsds['total'].append(second_total_rjsd)
+                        else:
+                            tmp_second_rjsds = dict(
+                                inference = list(),
+                                total = list()
+                            )
+                            tmp_second_rjsds['inference'].append(second_inference_rjsd)
+                            tmp_second_rjsds['total'].append(second_total_rjsd)
+                        with open(second_rjsds_path, 'wb') as f:
+                            pickle.dump(tmp_second_rjsds, f)
+                        draw_rjsds(tmp_second_rjsds, results_basepath)
+                        del tmp_second_rjsds
+                        logger.info(f'second: end_draw_rjsds')
 
                     fit_distribution_number += 1
                     with open(fit_distribution_dir.joinpath(f'inference-{fit_distribution_number}.pickle'), 'wb') as f:
