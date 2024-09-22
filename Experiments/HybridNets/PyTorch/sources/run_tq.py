@@ -431,7 +431,7 @@ if __name__ == "__main__":
     parser.add_argument('--warm-run', type=int, default=1)
     parser.add_argument('--fake-run', type=bool, default=True) # To avoid the outliers processed during the first inference
     parser.add_argument('--window-size', type=int, default=5)
-    parser.add_argument('--second--window-size', type=int, default=3)
+    parser.add_argument('--second-window-size', type=int, default=3)
     parser.add_argument('--fit-run-number', type=int, default=2)
     parser.add_argument('--rJSD-threshold', type=float, default=0.05)
     parser.add_argument('--max-run', type=int, default=0)
