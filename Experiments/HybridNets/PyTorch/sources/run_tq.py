@@ -407,7 +407,7 @@ def inference(parameters):
     return  tmp_inference_dic, tmp_total_dic
 
 
-def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
+def draw_rjsds(rjsds: List, results_basepath: pathlib.Path, name: str):
     inference_data = list(range(1, len(rjsds['inference']) + 1))
     total_data = list(range(1, len(rjsds['total']) + 1))
     fig, ax = plt.subplots()
@@ -420,8 +420,8 @@ def draw_rjsds(rjsds: List, results_basepath: pathlib.Path):
     ax.set_ylabel('rJSD')
     ax.grid(True)
     ax.legend()
-    plt.savefig(results_basepath.joinpath("rJSDs.jpg"), format="jpg")
-    plt.savefig(results_basepath.joinpath("rJSDs.pdf"), format="pdf")
+    plt.savefig(results_basepath.joinpath(f"rJSDs_{name}.jpg"), format="jpg")
+    plt.savefig(results_basepath.joinpath(f"rJSDs_{name}.pdf"), format="pdf")
 
 
 if __name__ == "__main__":
@@ -624,45 +624,53 @@ if __name__ == "__main__":
                         inference_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'inference'], key=lambda x: int(x.stem.split('-')[-1]))
                         total_model_paths = sorted([f for f in fit_distribution_dir.iterdir() if f.stem.split('-')[-2] == 'total'], key=lambda x: int(x.stem.split('-')[-1]))
 
-                        # window_size
-                        fit_inference_distribution_models = list()
-                        fit_total_distribution_models = list()
-                        for inference_model_path in inference_model_paths[-window_size:]:
-                            with open(inference_model_path, 'rb') as f:
-                                distribution_model = pickle.load(f)
-                                fit_inference_distribution_models.append(distribution_model)
-                        for total_model_path in total_model_paths[-window_size:]:
-                            with open(total_model_path, 'rb') as f:
-                                distribution_model = pickle.load(f)
-                                fit_total_distribution_models.append(distribution_model)
+                        if (fit_distribution_number % window_size == 0):
+                            # window_size
+                            fit_inference_distribution_models = list()
+                            fit_total_distribution_models = list()
+                            for inference_model_path in inference_model_paths[-window_size:]:
+                                with open(inference_model_path, 'rb') as f:
+                                    distribution_model = pickle.load(f)
+                                    fit_inference_distribution_models.append(distribution_model)
+                            for total_model_path in total_model_paths[-window_size:]:
+                                with open(total_model_path, 'rb') as f:
+                                    distribution_model = pickle.load(f)
+                                    fit_total_distribution_models.append(distribution_model)
 
-                        # second_window_size
-                        second_fit_inference_distribution_models = list()
-                        second_fit_total_distribution_models = list()
-                        for inference_model_path in inference_model_paths[-second_window_size:]:
-                            with open(inference_model_path, 'rb') as f:
-                                distribution_model = pickle.load(f)
-                                second_fit_inference_distribution_models.append(distribution_model)
-                        for total_model_path in total_model_paths[-second_window_size:]:
-                            with open(total_model_path, 'rb') as f:
-                                distribution_model = pickle.load(f)
-                                second_fit_total_distribution_models.append(distribution_model)
+                            # window_size
+                            logger.info(f'start_check_fit')
+                            inference_rjsd = check_fit_dynamic(fit_inference_distribution_models, fit_inference_distribution_model, all_inference_times, window_size)
+                            total_rjsd = check_fit_dynamic(fit_total_distribution_models, fit_total_distribution_model, all_total_times, window_size)
+                            logger.info(f'end_check_fit')
+                            del fit_inference_distribution_models
+                            del fit_total_distribution_models
+                        else:
+                            inference_rjsd = 1
+                            total_rjsd = 1
 
-                        # window_size
-                        logger.info(f'start_check_fit')
-                        inference_rjsd = check_fit_dynamic(fit_inference_distribution_models, fit_inference_distribution_model, all_inference_times, window_size)
-                        total_rjsd = check_fit_dynamic(fit_total_distribution_models, fit_total_distribution_model, all_total_times, window_size)
-                        logger.info(f'end_check_fit')
-                        del fit_inference_distribution_models
-                        del fit_total_distribution_models
+                        if (fit_distribution_number % second_window_size == 0):
+                            # second_window_size
+                            second_fit_inference_distribution_models = list()
+                            second_fit_total_distribution_models = list()
+                            for inference_model_path in inference_model_paths[-second_window_size:]:
+                                with open(inference_model_path, 'rb') as f:
+                                    distribution_model = pickle.load(f)
+                                    second_fit_inference_distribution_models.append(distribution_model)
+                            for total_model_path in total_model_paths[-second_window_size:]:
+                                with open(total_model_path, 'rb') as f:
+                                    distribution_model = pickle.load(f)
+                                    second_fit_total_distribution_models.append(distribution_model)
 
-                        # second_window_size
-                        logger.info(f'second_start_check_fit')
-                        second_inference_rjsd = check_fit_dynamic(second_fit_inference_distribution_models, fit_inference_distribution_model, all_inference_times, second_window_size)
-                        second_total_rjsd = check_fit_dynamic(second_fit_total_distribution_models, fit_total_distribution_model, all_total_times, second_window_size)
-                        logger.info(f'second_end_check_fit')
-                        del second_fit_inference_distribution_models
-                        del second_fit_total_distribution_models
+                            # second_window_size
+                            logger.info(f'second_start_check_fit')
+                            second_inference_rjsd = check_fit_dynamic(second_fit_inference_distribution_models, fit_inference_distribution_model, all_inference_times, second_window_size)
+                            second_total_rjsd = check_fit_dynamic(second_fit_total_distribution_models, fit_total_distribution_model, all_total_times, second_window_size)
+                            logger.info(f'second_end_check_fit')
+                            del second_fit_inference_distribution_models
+                            del second_fit_total_distribution_models
+                        else:
+                            second_inference_rjsd = 1
+                            second_total_rjsd = 1
 
                         logger.info(f'inference_rjsd is {inference_rjsd} / total_rjsd is {total_rjsd}')
                         logger.info(f'second_inference_rjsd is {second_inference_rjsd} / second_total_rjsd is {second_total_rjsd}')
@@ -676,49 +684,51 @@ if __name__ == "__main__":
                         if second_total_rjsd <= rJSD_threshold:
                             logger.info('second: total_times has fitted')
 
-                        # window_size
-                        logger.info(f'start_draw_rjsds')
-                        if rjsds_path.exists():
-                            with open(rjsds_path, 'rb') as f:
-                                rjsds = pickle.load(f)
-                                tmp_rjsds = rjsds.copy()
-                                del rjsds
-                            tmp_rjsds['inference'].append(inference_rjsd)
-                            tmp_rjsds['total'].append(total_rjsd)
-                        else:
-                            tmp_rjsds = dict(
-                                inference = list(),
-                                total = list()
-                            )
-                            tmp_rjsds['inference'].append(inference_rjsd)
-                            tmp_rjsds['total'].append(total_rjsd)
-                        with open(rjsds_path, 'wb') as f:
-                            pickle.dump(tmp_rjsds, f)
-                        draw_rjsds(tmp_rjsds, results_basepath)
-                        del tmp_rjsds
-                        logger.info(f'end_draw_rjsds')
+                        if (fit_distribution_number % window_size == 0):
+                            # window_size
+                            logger.info(f'start_draw_rjsds')
+                            if rjsds_path.exists():
+                                with open(rjsds_path, 'rb') as f:
+                                    rjsds = pickle.load(f)
+                                    tmp_rjsds = rjsds.copy()
+                                    del rjsds
+                                tmp_rjsds['inference'].append(inference_rjsd)
+                                tmp_rjsds['total'].append(total_rjsd)
+                            else:
+                                tmp_rjsds = dict(
+                                    inference = list(),
+                                    total = list()
+                                )
+                                tmp_rjsds['inference'].append(inference_rjsd)
+                                tmp_rjsds['total'].append(total_rjsd)
+                            with open(rjsds_path, 'wb') as f:
+                                pickle.dump(tmp_rjsds, f)
+                            draw_rjsds(tmp_rjsds, results_basepath, '1st')
+                            del tmp_rjsds
+                            logger.info(f'end_draw_rjsds')
 
                         # second_window_size
-                        logger.info(f'second: start_draw_rjsds')
-                        if second_rjsds_path.exists():
-                            with open(second_rjsds_path, 'rb') as f:
-                                second_rjsds = pickle.load(f)
-                                tmp_second_rjsds = second_rjsds.copy()
-                                del second_rjsds
-                            tmp_second_rjsds['inference'].append(second_inference_rjsd)
-                            tmp_second_rjsds['total'].append(second_total_rjsd)
-                        else:
-                            tmp_second_rjsds = dict(
-                                inference = list(),
-                                total = list()
-                            )
-                            tmp_second_rjsds['inference'].append(second_inference_rjsd)
-                            tmp_second_rjsds['total'].append(second_total_rjsd)
-                        with open(second_rjsds_path, 'wb') as f:
-                            pickle.dump(tmp_second_rjsds, f)
-                        draw_rjsds(tmp_second_rjsds, results_basepath)
-                        del tmp_second_rjsds
-                        logger.info(f'second: end_draw_rjsds')
+                        if (fit_distribution_number % second_window_size == 0):
+                            logger.info(f'second: start_draw_rjsds')
+                            if second_rjsds_path.exists():
+                                with open(second_rjsds_path, 'rb') as f:
+                                    second_rjsds = pickle.load(f)
+                                    tmp_second_rjsds = second_rjsds.copy()
+                                    del second_rjsds
+                                tmp_second_rjsds['inference'].append(second_inference_rjsd)
+                                tmp_second_rjsds['total'].append(second_total_rjsd)
+                            else:
+                                tmp_second_rjsds = dict(
+                                    inference = list(),
+                                    total = list()
+                                )
+                                tmp_second_rjsds['inference'].append(second_inference_rjsd)
+                                tmp_second_rjsds['total'].append(second_total_rjsd)
+                            with open(second_rjsds_path, 'wb') as f:
+                                pickle.dump(tmp_second_rjsds, f)
+                            draw_rjsds(tmp_second_rjsds, results_basepath, '2nd')
+                            del tmp_second_rjsds
+                            logger.info(f'second: end_draw_rjsds')
 
                     fit_distribution_number += 1
                     with open(fit_distribution_dir.joinpath(f'inference-{fit_distribution_number}.pickle'), 'wb') as f:
