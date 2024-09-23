@@ -36,14 +36,23 @@ def tail_quality(quality_calculation_function: Callable[[tuple[Any, Any, list[nu
         inference_validities_at_thresholds.append(inference_validities_at_threshold)
     print(f'Done')
 
+    # sorted_qts = list()
     for inference_validities_at_threshold, threshold in zip(inference_validities_at_thresholds, thresholds):
         parameters = ((inference_goldens, inference_results, inference_validities) for inference_validities in inference_validities_at_threshold)
         qualities_at_threshold = list()
         with multiprocessing.Pool(worker_number) as pool:
             with tqdm.tqdm(total=len(inference_validities_at_threshold), desc=f'Calculating Quality @ Threshold={threshold}') as progress_bar:
+                # for index, (vali, quality_at_threshold) in enumerate(pool.imap_unordered(quality_calculation_function, parameters), start=1):
                 for index, quality_at_threshold in enumerate(pool.imap_unordered(quality_calculation_function, parameters), start=1):
                     qualities_at_threshold.append(quality_at_threshold)
                     progress_bar.update(1)
+        # sorted_qts.append(sorted(qualities_at_threshold, key=lambda x: x[1]))
+        print(min(qualities_at_threshold), max(qualities_at_threshold))
         qualities_at_thresholds.append(qualities_at_threshold)
+    # print(sorted_qts[-2][0])
+    # print(sorted_qts[-2][-1])
+
+    # print(sorted_qts[-1][0])
+    # print(sorted_qts[-1][-1])
 
     return qualities_at_thresholds

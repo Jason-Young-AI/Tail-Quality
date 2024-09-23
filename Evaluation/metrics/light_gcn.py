@@ -60,7 +60,8 @@ class LightGCN(Task):
         ndcg[numpy.isnan(ndcg)] = 0.0
         ndcg = numpy.sum(ndcg)
 
-        precision = precision / len(goldens)
-        recall = recall / len(goldens)
-        ndcg = ndcg / len(goldens)
+        penalty = sum(validities)/len(validities)
+        precision = penalty * (precision / len(goldens))
+        recall    = penalty * (recall / len(goldens))
+        ndcg      = penalty * (ndcg / len(goldens))
         return precision, recall, ndcg

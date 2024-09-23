@@ -162,4 +162,8 @@ class HybridNets(Task):
         ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
         mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
 
-        return mr, map50, iou_score, miou_ls[0], acc_ls[2], iou_ls[2]
+        # return mr, map50, iou_score, miou_ls[0], acc_ls[2], iou_ls[2]
+        scores = numpy.array([mr, map50, iou_score, miou_ls[0], acc_ls[2], iou_ls[2]])
+        penalty = sum(validities)/len(validities)
+        scores = penalty * scores
+        return tuple(scores.tolist())

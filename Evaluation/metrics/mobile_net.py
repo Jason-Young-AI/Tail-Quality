@@ -41,4 +41,5 @@ class MobileNet(Task):
             total += 1
         top1_accuracy = top1_right / total
         top5_accuracy = top5_right / total
-        return (top1_accuracy, top5_accuracy)
+        penalty = sum(validities)/len(validities)
+        return (penalty * top1_accuracy, penalty * top5_accuracy)

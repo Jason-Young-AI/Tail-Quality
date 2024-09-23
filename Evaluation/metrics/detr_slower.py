@@ -80,4 +80,7 @@ class DETR(Task):
         coco_eval.summarize()
 
         #sys.stdout = original_stdout
-        return coco_eval.stats.tolist()
+        score = coco_eval.stats.tolist()
+        penalty = sum(validities)/len(validities)
+        return penalty * score
+        # return coco_eval.stats.tolist()

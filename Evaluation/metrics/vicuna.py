@@ -38,4 +38,5 @@ class Vicuna(Task):
             right += (validity and (golden in result))
             total += 1
         accuracy = right / total
-        return accuracy
+        penalty = sum(validities)/len(validities)
+        return penalty * accuracy

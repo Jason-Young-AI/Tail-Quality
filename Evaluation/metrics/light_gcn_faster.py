@@ -73,7 +73,9 @@ class LightGCNFaster(Task):
             total_ndcg += ndcg if validity else 0
             total += len(golden)
 
-        precision = total_precision / total
-        recall = total_recall / total
-        ndcg = total_ndcg / total
+        penalty = sum(validities)/len(validities)
+
+        precision = penalty * (total_precision / total)
+        recall    = penalty * (total_recall / total)
+        ndcg      = penalty * (total_ndcg / total)
         return precision, recall, ndcg

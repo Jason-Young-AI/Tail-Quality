@@ -46,4 +46,5 @@ class MobileNetFaster(Task):
             total += 1
         top1_accuracy = top1_acc / total
         top5_accuracy = top5_acc / total
-        return (top1_accuracy, top5_accuracy)
+        penalty = sum(validities)/len(validities)
+        return (penalty * top1_accuracy, penalty * top5_accuracy)

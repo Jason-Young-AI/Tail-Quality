@@ -1,6 +1,6 @@
 import numpy
 
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, precision_score, accuracy_score
 
 from . import Task
 from ..utils.io import load_json, load_pickle
@@ -33,11 +33,16 @@ class EmotionFlow(Task):
         # each element of inference_results must be a list
         if len(results) == 0:
             return float('NaN')
-        
+
         invalid_result = min(goldens) - 1
 
         masked_results = list()
         for result, validity in zip(results, validities):
             result = result if validity else invalid_result
             masked_results.append(result)
-        return f1_score(goldens, masked_results, average='weighted')
+        score = f1_score(goldens, masked_results, average='weighted')
+        penalty = sum(validities)/len(validities)
+        return penalty * score
+        # return f1_score(goldens, masked_results, average='weighted')
+        # return accuracy_score(goldens, masked_results)
+        #return numpy.where(validities == False)[0], precision_score(goldens, masked_results, average='weighted')
