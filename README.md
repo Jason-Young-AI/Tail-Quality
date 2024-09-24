@@ -1,6 +1,18 @@
 # Tail-Quality
 The official source code for paper: Quality at the Tail of the Machine Learning
 
+
+### Evaluation
+
+#### Evirenment
+```
+conda create -n TQEval python=3.10
+```
+
+```
+pip install scikit-learn tqdm faster_coco_eval scipy
+```
+
 ### Experiments
 
 | Models      | Task                 | PyTorch                                     | TensorFlow                                   | ONNX                                   |
