@@ -10,6 +10,10 @@ conda create -n TQEval python=3.10
 ```
 
 ```
+conda activate TQEval
+```
+
+```
 pip install scikit-learn tqdm faster_coco_eval scipy
 ```
 
