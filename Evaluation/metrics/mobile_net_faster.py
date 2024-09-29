@@ -32,7 +32,7 @@ class MobileNetFaster(Task):
         return None, top_results, multiple_inference_times
 
     @classmethod
-    def calculate_metrics(cls, goldens: None, results: list[tuple[float, float]], validities: numpy.ndarray) -> tuple[float, float]:
+    def calculate_metrics(cls, goldens: None, results: list[tuple[float, float]], validities: numpy.ndarray) -> tuple[list[float], float]:
         # each element of inference_results must be a list
         if len(results) == 0:
             return float('NaN')
@@ -46,5 +46,5 @@ class MobileNetFaster(Task):
             total += 1
         top1_accuracy = top1_acc / total
         top5_accuracy = top5_acc / total
-        penalty = sum(validities)/len(validities)
-        return (penalty * top1_accuracy, penalty * top5_accuracy)
+        penalty = float(sum(validities)/len(validities))
+        return [top1_accuracy, top5_accuracy], penalty

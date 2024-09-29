@@ -105,7 +105,7 @@ class HybridNets(Task):
 
 
     @classmethod
-    def calculate_metrics(cls, goldens: None, results: list[int], validities: numpy.ndarray) -> tuple[float, float, float, float, float]:
+    def calculate_metrics(cls, goldens: None, results: list[int], validities: numpy.ndarray) -> tuple[list[float], float]:
         # Return: Recall, mAP@50, mIoU, Acc, IoU
         # Traffic Object Detection - (Recall, mAP@50)
         # Drivable Area Segmentation - (mIoU)
@@ -163,7 +163,6 @@ class HybridNets(Task):
         mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
 
         # return mr, map50, iou_score, miou_ls[0], acc_ls[2], iou_ls[2]
-        scores = numpy.array([mr, map50, iou_score, miou_ls[0], acc_ls[2], iou_ls[2]])
-        penalty = sum(validities)/len(validities)
-        scores = penalty * scores
-        return tuple(scores.tolist())
+        scores = [mr, map50, iou_score, miou_ls[0], acc_ls[2], iou_ls[2]]
+        penalty = float(sum(validities)/len(validities))
+        return scores, penalty

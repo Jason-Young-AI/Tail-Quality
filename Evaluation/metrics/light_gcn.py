@@ -27,7 +27,7 @@ class LightGCN(Task):
 
 
     @classmethod
-    def calculate_metrics(cls, goldens: list[list[int]], results: list[list[int]], validities: numpy.ndarray) -> tuple[float, float, float]:
+    def calculate_metrics(cls, goldens: list[list[int]], results: list[list[int]], validities: numpy.ndarray) -> tuple[list[float], float]:
         # Return Precision, Recall, Normalized Discounted Cumulative Gain
         # each element of inference_results must be a list
         if len(results) == 0:
@@ -60,8 +60,8 @@ class LightGCN(Task):
         ndcg[numpy.isnan(ndcg)] = 0.0
         ndcg = numpy.sum(ndcg)
 
-        penalty = sum(validities)/len(validities)
+        penalty = float(sum(validities)/len(validities))
         precision = penalty * (precision / len(goldens))
         recall    = penalty * (recall / len(goldens))
         ndcg      = penalty * (ndcg / len(goldens))
-        return precision, recall, ndcg
+        return [precision, recall, ndcg], penalty

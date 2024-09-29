@@ -50,6 +50,7 @@ if __name__ == '__main__':
     parser.add_argument('--task-name', type=str, choices=tasks.keys(), required=True)
 
     parser.add_argument('--worker-number', type=int, default=8)
+    parser.add_argument('--worker-batch-size', type=int, default=8)
     args = parser.parse_args()
 
     specific_thresholds = numpy.array(args.specific_thresholds, dtype=float).tolist() if args.specific_thresholds is not None else numpy.array([], dtype=float)
@@ -126,14 +127,14 @@ if __name__ == '__main__':
 
         if specific_filepath is not None:
             print(f'Calculating Specific Tail Qualities ... ')
-            specific_tq = tail_quality(task.get_metrics, goldens, results, multiple_inference_times, specific_thresholds, args.worker_number)
-            specific_thres2tq = [(thres, tq) for thres, tq in zip(specific_thresholds, specific_tq)]
-            save_pickle(specific_thres2tq, specific_filepath)
+            specific_q, specific_p = tail_quality(task.get_metrics, goldens, results, multiple_inference_times, specific_thresholds, args.worker_number, args.worker_batch_size)
+            specific_thres2qp = [(thres, q, p) for thres, q, p in zip(specific_thresholds, specific_q, specific_p)]
+            save_pickle(specific_thres2qp, specific_filepath)
             print(f'Done')
 
         if multihop_filepath is not None:
             print(f'Calculating Multihop Tail Qualities ... ')
-            multihop_tq = tail_quality(task.get_metrics, goldens, results, multiple_inference_times, multihop_thresholds, args.worker_number)
-            multihop_thres2tq = [(thres, tq) for thres, tq in zip(multihop_thresholds, multihop_tq)]
-            save_pickle(multihop_thres2tq, multihop_filepath)
+            multihop_q, multihop_p = tail_quality(task.get_metrics, goldens, results, multiple_inference_times, multihop_thresholds, args.worker_number, args.worker_batch_size)
+            multihop_thres2qp = [(thres, q, p) for thres, q, p in zip(multihop_thresholds, multihop_q, multihop_p)]
+            save_pickle(multihop_thres2qp, multihop_filepath)
             print(f'Done')
