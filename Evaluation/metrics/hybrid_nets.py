@@ -91,13 +91,12 @@ def ap_per_class(tp, conf, pred_cls, target_cls, names=[]):
 
 class HybridNets(Task):
     @classmethod
-    def pre_process(cls, goldens_filepath, results_filepath, alltime_filepath, alltime_type) -> tuple[None, list[str], list[list[float]]]:
+    def pre_process(cls, goldens_filepath, results_filepath, alltime, alltime_type) -> tuple[None, list[str], list[list[float]]]:
         results = load_pickle(results_filepath)
         results, results_batch_sizes = expand_indexed_batches(results)
 
-        alltime = load_pickle(alltime_filepath)[alltime_type]
         multiple_inference_times: list[list[float]] = list()
-        for round_time in alltime:
+        for round_time in alltime[alltime_type]:
             round_time = expand_round_time(round_time, results_batch_sizes)
             multiple_inference_times.append(round_time)
 

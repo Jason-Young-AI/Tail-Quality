@@ -7,7 +7,7 @@ from ..utils.expand import expand_indexed_batches, expand_round_time, get_sorted
 
 class MobileNetFaster(Task):
     @classmethod
-    def pre_process(cls, goldens_filepath, results_filepath, alltime_filepath, alltime_type) -> tuple[None, list[tuple[float, float]], list[list[float]]]:
+    def pre_process(cls, goldens_filepath, results_filepath, alltime, alltime_type) -> tuple[None, list[tuple[float, float]], list[list[float]]]:
         goldens = load_pickle(goldens_filepath)
         goldens = [golden for index, golden in get_sorted_batch(goldens)]
 
@@ -23,9 +23,8 @@ class MobileNetFaster(Task):
                 top5_right += int(golden_item in top5_result)
             top_results.append((top1_right/len(golden), top5_right/len(golden)))
 
-        alltime = load_pickle(alltime_filepath)[alltime_type]
         multiple_inference_times: list[list[float]] = list()
-        for round_time in alltime:
+        for round_time in alltime[alltime_type]:
             round_time = [batch_time for index, batch_time in get_sorted_batch(round_time)]
             multiple_inference_times.append(round_time)
 

@@ -37,7 +37,7 @@ def get_triple_metrics(goldens, results):
 
 class LightGCNFaster(Task):
     @classmethod
-    def pre_process(cls, goldens_filepath, results_filepath, alltime_filepath, alltime_type) -> tuple[list[int], list[int], list[list[float]]]:
+    def pre_process(cls, goldens_filepath, results_filepath, alltime, alltime_type) -> tuple[list[int], list[int], list[list[float]]]:
         goldens = load_pickle(goldens_filepath)
         goldens = [golden for index, golden in get_sorted_batch(goldens)]
 
@@ -48,9 +48,8 @@ class LightGCNFaster(Task):
             precision, recall, ndcg = get_triple_metrics(golden, result)
             triple_results.append((precision, recall, ndcg))
 
-        alltime = load_pickle(alltime_filepath)[alltime_type]
         multiple_inference_times: list[list[float]] = list()
-        for round_time in alltime:
+        for round_time in alltime[alltime_type]:
             round_time = [batch_time for index, batch_time in get_sorted_batch(round_time)]
             multiple_inference_times.append(round_time)
 

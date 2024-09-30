@@ -15,7 +15,7 @@ from .metrics.mobile_net_faster   import MobileNetFaster
 from .metrics.light_gcn_faster    import LightGCNFaster
 
 from .utils.io import save_pickle, load_pickle
-from .utils.times import remove_outliers
+from .utils.times import remove_outliers, get_outlier_flags
 from .tail_quality import tail_quality
 from .calculate_tl import get_tail_latency
 
@@ -30,11 +30,73 @@ tasks: dict[str, Task] = dict(
 )
 
 
+def swipe_all_times(rjsd_stop: float, all_rjsds: dict[str, list[int]], all_times: dict[str, list[dict[int, float]]], warm_run: int, window_size: int, fit_run_number: int) -> dict[str, list[dict[int, float]]]:
+    fit_distribution_number = 0
+
+    swiped_all_times = dict(
+        inference=list(),
+        total=list(),
+    )
+
+    inference_all_times = all_times['inference']
+    total_all_times = all_times['total']
+    assert len(inference_all_times) == len(total_all_times)
+
+    inference_all_rjsds = all_rjsds['inference']
+    total_all_rjsds = all_rjsds['total']
+    assert len(inference_all_rjsds) == len(total_all_rjsds)
+
+    inference_rjsd_converge = False
+    total_rjsd_converge = False
+
+    for already_run, (inference_times, total_times) in enumerate(zip(inference_all_times, total_all_times), start=1):
+        if inference_rjsd_converge and total_rjsd_converge:
+            break
+
+        if not inference_rjsd_converge:
+            swiped_all_times['inference'].append(inference_times)
+        if not total_rjsd_converge:
+            swiped_all_times['total'].append(total_times)
+
+        if already_run > warm_run and (already_run - warm_run) % fit_run_number == 0:
+            inference_rjsd = all_rjsds['inference'][fit_distribution_number]
+            total_rjsd = all_rjsds['total'][fit_distribution_number]
+            if fit_distribution_number % window_size == 0 and fit_distribution_number != 0:
+                if not inference_rjsd_converge and inference_rjsd <= rjsd_stop:
+                    inference_rjsd_converge = True
+                if not total_rjsd_converge and total_rjsd <= rjsd_stop:
+                    total_rjsd_converge = True
+
+            fit_distribution_number += 1
+            if fit_distribution_number >= len(all_rjsds['inference']):
+                break
+
+    if not inference_rjsd_converge:
+        print(f"===============================================================")
+        print(f"WARNING: [Inference] No Converge Below RJSD Stop - {rjsd_stop} ")
+        print(f"===============================================================")
+
+    if not total_rjsd_converge:
+        print(f"===============================================================")
+        print(f"WARNING: [Total] No Converge Below RJSD Stop - {rjsd_stop} ")
+        print(f"===============================================================")
+    return swiped_all_times
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Calculate Tail Quality")
+    parser.add_argument('-j', '--allrjsd-filepath', type=str, required=True)
     parser.add_argument('-t', '--alltime-filepath', type=str, required=True)
+
     parser.add_argument('-p', '--results-filepath', type=str, required=True)
     parser.add_argument('-g', '--goldens-filepath', type=str, required=True)
+
+    parser.add_argument('--rjsd-stop', type=float, required=True)
+    # Must Be The Same As Experiment Settings
+    parser.add_argument('--fit-run-number', type=int, required=True)
+    parser.add_argument('--window-size', type=int, required=True)
+    parser.add_argument('--warm-run', type=int, required=True)
 
     parser.add_argument('-s', '--specific-thresholds', type=float, nargs='*')
     parser.add_argument('--specific-filepath', type=str, default=None)
@@ -45,7 +107,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--multihop-thresholds-noo', action='store_true')
     parser.add_argument('--multihop-filepath', type=str, default=None)
 
-    parser.add_argument('--alltime-type', type=str, choices=['inference', 'total'], required=True)
+    parser.add_argument('--type-name', type=str, choices=['inference', 'total'], required=True)
 
     parser.add_argument('--task-name', type=str, choices=tasks.keys(), required=True)
 
@@ -53,7 +115,18 @@ if __name__ == '__main__':
     parser.add_argument('--worker-batch-size', type=int, default=8)
     args = parser.parse_args()
 
-    specific_thresholds = numpy.array(args.specific_thresholds, dtype=float).tolist() if args.specific_thresholds is not None else numpy.array([], dtype=float)
+    rjsd_stop = args.rjsd_stop
+    fit_run_number = args.fit_run_number
+    window_size = args.window_size
+    warm_run = args.warm_run
+
+    assert ((0 <= rjsd_stop) and (rjsd_stop <=1))
+    allrjsd = load_pickle(args.allrjsd_filepath)
+    alltime = load_pickle(args.alltime_filepath)
+
+    alltime = swipe_all_times(rjsd_stop, allrjsd, alltime, warm_run, window_size, fit_run_number)
+
+    specific_thresholds = numpy.array(args.specific_thresholds, dtype=float).tolist() if args.specific_thresholds is not None else numpy.array([], dtype=float).tolist()
     if len(specific_thresholds) != 0:
         assert args.specific_filepath is not None
         specific_filepath = pathlib.Path(args.specific_filepath)
@@ -84,11 +157,10 @@ if __name__ == '__main__':
             print(f'Exit!')
             sys.exit(0)
         else:
-            alltime = load_pickle(args.alltime_filepath)
             total_round, inference_tail_latency, total_tail_latency = get_tail_latency(alltime, [0, 100, 90, 95, 99, 99.9])
-            if args.alltime_type == 'inference':
+            if args.type_name == 'inference':
                 tls = inference_tail_latency
-            if args.alltime_type == 'total':
+            if args.type_name == 'total':
                 tls = total_tail_latency
 
             if args.specific_filepath is not None:
@@ -103,12 +175,13 @@ if __name__ == '__main__':
                 print(f'Now Using Default Multihop Thresholds:')
                 if multihop_thresholds_noo:
                     print(f'Now Remove Outliers ...')
-                    new_alltime = list()
-                    for round_time in alltime[args.alltime_type]:
-                        for _, batch_time in round_time.items():
-                            new_alltime.append(batch_time)
-                    alltime = remove_outliers(numpy.array(new_alltime))
-                    tls = (min(alltime), max(alltime))
+                    clean_alltimes = list()
+                    for round_time in alltime[args.type_name]:
+                        for _, batch_t in round_time.items():
+                            clean_alltimes.append(batch_t)
+                    clean_alltimes = remove_outliers(numpy.array(clean_alltimes))
+
+                    tls = (min(clean_alltimes), max(clean_alltimes))
                 multihop_filepath = pathlib.Path(args.multihop_filepath)
                 multihop_thresholds = numpy.linspace(tls[0], tls[1], 100, dtype=float).tolist()
                 print(f'Multihop: Min = {tls[0]:.3f} | Max = {tls[1]:.3f} | Hop = 100')
@@ -120,9 +193,8 @@ if __name__ == '__main__':
         task = tasks[args.task_name]
         results_filepath = pathlib.Path(args.results_filepath)
         goldens_filepath = pathlib.Path(args.goldens_filepath)
-        alltime_filepath = pathlib.Path(args.alltime_filepath)
         print(f'Preprocessing All Goldens, Results, and Inference Times ... ')
-        goldens, results, multiple_inference_times = task.pre_process(goldens_filepath, results_filepath, alltime_filepath, args.alltime_type)
+        goldens, results, multiple_inference_times = task.pre_process(goldens_filepath, results_filepath, alltime, args.type_name)
         print(f'Done')
 
         if specific_filepath is not None:

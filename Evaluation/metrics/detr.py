@@ -28,7 +28,7 @@ def coco2numpy(coco_results):
 
 class DETR(Task):
     @classmethod
-    def pre_process(cls, goldens_filepath, results_filepath, alltime_filepath, alltime_type) -> tuple[COCO, numpy.ndarray, list[list[float]]]:
+    def pre_process(cls, goldens_filepath, results_filepath, alltime, alltime_type) -> tuple[COCO, numpy.ndarray, list[list[float]]]:
         goldens = COCO(str(goldens_filepath))
 
         results = load_json(results_filepath)
@@ -37,9 +37,8 @@ class DETR(Task):
 
         results = [coco2numpy(cand_result) for cand_result in results]
 
-        alltime = load_pickle(alltime_filepath)[alltime_type]
         multiple_inference_times: list[list[float]] = list()
-        for round_time in alltime:
+        for round_time in alltime[alltime_type]:
             round_time = expand_round_time(round_time, batch_sizes)
             multiple_inference_times.append(round_time)
 

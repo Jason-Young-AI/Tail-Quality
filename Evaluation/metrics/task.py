@@ -4,7 +4,7 @@ from typing import Any
 
 class Task(object):
     @classmethod
-    def pre_process(cls, goldens_filepath, results_filepath, alltime_filepath) -> tuple[Any, Any, list[list[float]]]:
+    def pre_process(cls, goldens_filepath, results_filepath, alltime, alltime_type) -> tuple[Any, Any, list[list[float]]]:
         # This classmethod should return goldens, results, multiple_inference_times
         raise NotImplementedError
 

@@ -7,7 +7,7 @@ from ..utils.expand import expand_indexed_batches, expand_round_time
 
 class Vicuna(Task):
     @classmethod
-    def pre_process(cls, goldens_filepath, results_filepath, alltime_filepath, alltime_type) -> tuple[list[str], list[str], list[list[float]]]:
+    def pre_process(cls, goldens_filepath, results_filepath, alltime, alltime_type) -> tuple[list[str], list[str], list[list[float]]]:
         goldens = load_json(goldens_filepath)
         goldens, goldens_batch_sizes = expand_indexed_batches(goldens)
 
@@ -17,9 +17,8 @@ class Vicuna(Task):
         assert len(goldens_batch_sizes) == len(results_batch_sizes)
         assert sum(goldens_batch_sizes) == sum(results_batch_sizes)
 
-        alltime = load_pickle(alltime_filepath)[alltime_type]
         multiple_inference_times: list[list[float]] = list()
-        for round_time in alltime:
+        for round_time in alltime[alltime_type]:
             round_time = expand_round_time(round_time, results_batch_sizes)
             multiple_inference_times.append(round_time)
 
