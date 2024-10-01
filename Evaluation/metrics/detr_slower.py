@@ -54,8 +54,9 @@ class DETR(Task):
 
     @classmethod
     def calculate_metrics(cls, goldens: COCO, results: numpy.ndarray, validities: numpy.ndarray) -> tuple[list[float], float]:
+        penalty = float(sum(validities)/len(validities))
         if len(results) == 0:
-            return float('NaN')
+            return float('NaN'), penalty
 
         assert len(results) == len(validities)
         #masked_results = list()
@@ -65,7 +66,7 @@ class DETR(Task):
         masked_results = results[validities == True]
 
         if len(masked_results) == 0:
-            return float('NaN')
+            return float('NaN'), penalty
 
         #original_stdout = sys.stdout
         #sys.stdout = io.StringIO()
@@ -80,6 +81,5 @@ class DETR(Task):
 
         #sys.stdout = original_stdout
         score = coco_eval.stats.tolist()
-        penalty = float(sum(validities)/len(validities))
         return score, penalty
         # return coco_eval.stats.tolist()

@@ -111,6 +111,7 @@ class HybridNets(Task):
         # Lane Line Detection - (Acc, IoU)
         # each element of inference_results must be a list
 
+        penalty = float(sum(validities)/len(validities))
         ncs = 3
         stats = []
         iou_ls = [[] for _ in range(ncs)]
@@ -163,5 +164,4 @@ class HybridNets(Task):
 
         # return mr, map50, iou_score, miou_ls[0], acc_ls[2], iou_ls[2]
         scores = [mr, map50, iou_score, miou_ls[0], acc_ls[2], iou_ls[2]]
-        penalty = float(sum(validities)/len(validities))
         return scores, penalty

@@ -28,8 +28,9 @@ class Vicuna(Task):
     @classmethod
     def calculate_metrics(cls, goldens: list[str], results: list[str], validities: numpy.ndarray) -> tuple[float, float]:
         # each element of inference_results must be a list
+        penalty = sum(validities)/len(validities)
         if len(results) == 0:
-            return float('NaN')
+            return float('NaN'), penalty
 
         right = 0
         total = 0
@@ -37,5 +38,4 @@ class Vicuna(Task):
             right += (validity and (golden in result))
             total += 1
         accuracy = right / total
-        penalty = sum(validities)/len(validities)
         return accuracy, penalty

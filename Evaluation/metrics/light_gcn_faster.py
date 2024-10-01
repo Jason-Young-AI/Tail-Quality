@@ -60,8 +60,10 @@ class LightGCNFaster(Task):
     def calculate_metrics(cls, goldens: list[list[int]], results: list[list[int]], validities: numpy.ndarray) -> tuple[list[float], float]:
         # Return Precision, Recall, Normalized Discounted Cumulative Gain
         # each element of inference_results must be a list
+        penalty = float(sum(validities)/len(validities))
+
         if len(results) == 0:
-            return float('NaN')
+            return float('NaN'), penalty
         total_precision = 0
         total_recall = 0
         total_ndcg = 0
@@ -72,9 +74,7 @@ class LightGCNFaster(Task):
             total_ndcg += ndcg if validity else 0
             total += len(golden)
 
-        penalty = float(sum(validities)/len(validities))
-
-        precision = penalty * (total_precision / total)
-        recall    = penalty * (total_recall / total)
-        ndcg      = penalty * (total_ndcg / total)
+        precision = (total_precision / total)
+        recall    = (total_recall / total)
+        ndcg      = (total_ndcg / total)
         return [precision, recall, ndcg], penalty

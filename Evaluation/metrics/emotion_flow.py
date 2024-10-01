@@ -30,8 +30,9 @@ class EmotionFlow(Task):
     @classmethod
     def calculate_metrics(cls, goldens: list[int], results: list[int], validities: numpy.ndarray) -> tuple[float, float]:
         # each element of inference_results must be a list
+        penalty = float(sum(validities)/len(validities))
         if len(results) == 0:
-            return float('NaN')
+            return float('NaN'), penalty
 
         invalid_result = min(goldens) - 1
 
@@ -40,7 +41,6 @@ class EmotionFlow(Task):
             result = result if validity else invalid_result
             masked_results.append(result)
         score = f1_score(goldens, masked_results, average='weighted')
-        penalty = float(sum(validities)/len(validities))
         return score, penalty
         # return f1_score(goldens, masked_results, average='weighted')
         # return accuracy_score(goldens, masked_results)
