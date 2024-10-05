@@ -362,6 +362,7 @@ def inference(parameters):
     only_quality = parameters['only_quality']
     golden_path = parameters['golden_path']
     result_path = parameters['result_path']
+    io_path = parameters['io_path']
 
     tmp_inference_dic = dict()
     tmp_total_dic = dict()
