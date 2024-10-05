@@ -290,12 +290,12 @@ def inference(parameters):
         if only_quality:
             with open(io_path, 'w') as io_file:
                 json.dump(ios, io_file, indent=2)
-            with open(result_path, 'w') as result_file:
-                json.dump(overall_result_dic, result_file, indent=2)
-            annotations_file_url = 'https://huggingface.co/datasets/AIJasonYoung/Tail-Quality-Assets/resolve/main/DETR/coco_2017_annotations.json'
-            urllib.request.urlretrieve(annotations_file_url, golden_path)
-            with open(others_path, 'w') as others_file:
-                json.dump(overall_others_dic, others_file, indent=2)
+            # with open(result_path, 'w') as result_file:
+            #     json.dump(overall_result_dic, result_file, indent=2)
+            # annotations_file_url = 'https://huggingface.co/datasets/AIJasonYoung/Tail-Quality-Assets/resolve/main/DETR/coco_2017_annotations.json'
+            # urllib.request.urlretrieve(annotations_file_url, golden_path)
+            # with open(others_path, 'w') as others_file:
+            #     json.dump(overall_others_dic, others_file, indent=2)
 
     return  tmp_inference_dic, tmp_total_dic
 
