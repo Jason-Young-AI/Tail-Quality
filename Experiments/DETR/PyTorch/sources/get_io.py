@@ -229,7 +229,7 @@ def inference(parameters):
             image_sizes.append(torch.as_tensor([int(h), int(w)]))
             image_indices.append(img_id)
 
-        this_i = (image_sizes[0][0], image_sizes[0][1])
+        this_i = (int(image_sizes[0][0]), int(image_sizes[0][1]))
         if cpu:
             images = nested_tensor_from_tensor_list(images)
             image_sizes = torch.stack(image_sizes, dim=0)
