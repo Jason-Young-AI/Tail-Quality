@@ -1,4 +1,4 @@
-import json
+import numpy
 import pickle
 import pathlib
 import argparse
@@ -38,17 +38,19 @@ if __name__ == "__main__":
 
     i2t = sorted(i2t, key=lambda x: (x[0][0], x[0][1]))
 
-    sizes = [(h, w) for (h, w), _ in i2t]
+    img_sizes = [(h, w) for (h, w), _ in i2t]
 
     fig, axes = plt.subplots(1, 1, figsize=(10, 10))
     ax = axes
 
 
-    all_s = [h*w for (h, w) in sizes]
-    all_h = [h for (h, w) in sizes]
-    all_w = [w for (h, w) in sizes]
+    all_h = [h for (h, w) in img_sizes]
+    all_w = [w for (h, w) in img_sizes]
+    t_std = [numpy.std(this_t, ddof=1)*1000 for _, this_t in i2t]
+    print(min(t_std), max(t_std))
+    t_avg = [numpy.average(this_t) for _, this_t in i2t]
 
-    ax.hist(all_s, bins=100, edgecolor='black')
+    ax.scatter(all_h, all_w, s=t_std, c=t_avg, cmap='viridis', alpha=0.6)
 
     ax.set_xlabel('Image Size')
     ax.set_ylabel('Frequencies')
