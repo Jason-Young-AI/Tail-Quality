@@ -8,38 +8,25 @@ import pathlib
 import logging
 import argparse
 import matplotlib.pyplot as plt
-import urllib.request
 
 from pathlib import Path
 
-
-import torch.nn.functional as F
-from PIL import Image
 from tqdm import tqdm
-from transforms import Compose, DetermineResize, ToTensor, Normalize
 from sklearn.neighbors import KernelDensity
 from sklearn.mixture import GaussianMixture
 from scipy.spatial.distance import jensenshannon
-from utils import prepare_for_coco_detection
-from box_ops import box_cxcywh_to_xyxy
 from typing import List
-from pycocotools.coco import COCO
-
-from misc import nested_tensor_from_tensor_list
-
+from torchvision import transforms
+import torch.nn.functional as F
+from transformers import LlamaForCausalLM, LlamaTokenizer
+import tensor_parallel as tp
+import pandas as pd
 
 import time
 import torch
-from detr import DETR
+import numpy as np
 
 from KDEpy.bw_selection import improved_sheather_jones
-
-
-image_preprocessing_local = Compose([
-    DetermineResize(800, max_size=1333),
-    ToTensor(),
-    Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-])
 
 def set_logger(
     name: str,
@@ -144,157 +131,194 @@ def check_fit_dynamic(fit_distribution_models, fit_distribution_model, all_times
     return numpy.sqrt(avg_jsd)
 
 
-def load_dataset(anno_path, image_dir):
-    coco = COCO(anno_path)
-    image_ids = list(sorted(coco.imgs.keys()))
-    img_paths = list()
+def load_dataset(dev_path, subset_path, mode='val'):
+    tasks = [
+        'abstract_algebra', 'anatomy', 'astronomy', 'business_ethics', 'clinical_knowledge', 'college_biology', 'college_chemistry', 'college_computer_science',
+        'college_mathematics', 'college_medicine', 'college_physics', 'computer_security', 'conceptual_physics', 'econometrics', 'electrical_engineering',
+        'elementary_mathematics', 'formal_logic', 'global_facts', 'high_school_biology', 'high_school_chemistry', 'high_school_computer_science',
+        'high_school_european_history', 'high_school_geography', 'high_school_government_and_politics', 'high_school_macroeconomics', 'high_school_mathematics',
+        'high_school_microeconomics', 'high_school_physics', 'high_school_psychology', 'high_school_statistics', 'high_school_us_history', 'high_school_world_history',
+        'human_aging', 'human_sexuality', 'international_law', 'jurisprudence', 'logical_fallacies', 'machine_learning', 'management', 'marketing', 'medical_genetics',
+        'miscellaneous', 'moral_disputes', 'moral_scenarios', 'nutrition', 'philosophy', 'prehistory', 'professional_accounting', 'professional_law',
+        'professional_medicine', 'professional_psychology', 'public_relations', 'security_studies', 'sociology', 'us_foreign_policy', 'virology', 'world_religions'
+    ]
+    data_paths = list()
+    for task in tasks:
+        dev_task_path = dev_path.joinpath(f'{task}_dev.csv')
+        assert dev_task_path.is_file(), f"MMLU dev task path {dev_task_path} does not exist"
 
-    for image_id in image_ids:
-        image_name = coco.loadImgs(image_id)[0]["file_name"]
-        img_paths.append(os.path.join(image_dir, image_name))
+        subset_task_path = subset_path.joinpath(f'{task}_{mode}.csv')
+        assert subset_task_path.is_file(), f"MMLU {mode} task path {subset_task_path} does not exist"
+        data_paths.append((dev_task_path, subset_task_path))
 
-    return img_paths, image_ids
-
-
-def postprocess(outputs, image_sizes, image_indices):
-    out_logits, out_bbox = outputs['pred_logits'], outputs['pred_boxes']
-
-    prob = F.softmax(out_logits, -1)
-    scores, labels = prob[..., :-1].max(-1)
-
-    # convert to [x0, y0, x1, y1] format
-    boxes = box_cxcywh_to_xyxy(out_bbox)
-    # and from relative [0, 1] to absolute [0, height] coordinates
-    img_h, img_w = image_sizes.unbind(1)
-    scale_fct = torch.stack([img_w, img_h, img_w, img_h], dim=1)
-    scale_fct = scale_fct.to(boxes.device)
-    boxes = boxes * scale_fct[:, None, :]
-
-    raw_results = [{'scores': s, 'labels': l, 'boxes': b} for s, l, b in zip(scores, labels, boxes)]
-
-    results = prepare_for_coco_detection(raw_results, image_indices)
-    return results
+    return tasks, data_paths
 
 
-def add_other(coco_results, image_sizes, image_shape):
-    coco_results_with_other = list()
-    for coco_result, image_size in zip(coco_results, image_sizes):
-        coco_results_with_other.append(
-            dict(
-                origin_image_size=image_size,
-                batch_image_size=image_shape,
-                result=coco_result,
-            )
-        )
+def load_llm(model_path):
+    n_gpus = torch.cuda.device_count()
 
-    return coco_results_with_other
+    # we use tensor parallel for loading llama
+    tokenizer = LlamaTokenizer.from_pretrained(model_path, use_fast=False, padding_side="left")
+    
+    model = LlamaForCausalLM.from_pretrained(model_path, low_cpu_mem_usage = True, torch_dtype=torch.float16)
+    model = tp.tensor_parallel(model, [i for i in range(n_gpus)])
+
+    tokenizer.pad_token_id = 0 if tokenizer.pad_token_id is None else tokenizer.pad_token_id
+    tokenizer.bos_token_id = 1
+
+    model.eval()
+
+    return model, tokenizer
+
+
+def prepare_input(tokenizer, prompts):
+    input_tokens = tokenizer.batch_encode_plus(prompts, return_tensors="pt", padding=True)
+    input_tokens = {k:input_tokens[k] for k in input_tokens if k in ["input_ids", "attention_mask"]}
+    for t in input_tokens:
+        if torch.is_tensor(input_tokens[t]):
+            input_tokens[t] = input_tokens[t].to('cuda')
+
+    return input_tokens
+
+def batch_split(prompts, batch_size):
+    batch_prompts = []
+    mini_batch = []
+    for prompt in prompts:
+        mini_batch.append(prompt)
+        if len(mini_batch) == batch_size:
+            batch_prompts.append(mini_batch)
+            mini_batch = []
+    if len(mini_batch) != 0:
+        batch_prompts.append(mini_batch)
+    return batch_prompts
+
+
+def format_example(data_frame, index, include_answer=True):
+    choices = ["A", "B", "C", "D"]
+    assert len(choices) == data_frame.shape[1] - 2
+    prompt = data_frame.iloc[index, 0]
+    for i in range(len(choices)):
+        prompt += f"\n{choices[i]}. {data_frame.iloc[index, i+1]}"
+    prompt += "\nAnswer:"
+    if include_answer:
+        prompt += f" {data_frame.iloc[index, len(choices)+1]}\n\n"
+    return prompt
+
+
+def format_subject(subject):
+    l = subject.split("_")
+    s = ""
+    for entry in l:
+        s += " " + entry
+    return s
+
+
+def gen_prompt(train_data_frame, subject, number_train=-1):
+    prompt = f"The following are multiple choice questions (with answers) about {format_subject(subject)}.\n\n"
+    if number_train == -1:
+        number_train = train_data_frame.shape[0]
+    for i in range(number_train):
+        prompt += format_example(train_data_frame, i)
+    return prompt
 
 
 def inference(parameters):
-    img_ids = parameters['img_ids']
-    img_paths = parameters['img_paths']
-    detr = parameters['detr']
+    data_paths = parameters['data_paths']
+    tasks = parameters['tasks']
     fake_run = parameters['fake_run']
+    tokenizer = parameters['tokenizer']
+    llm = parameters['llm']
+    batch_size = parameters['batch_size']
+    number_train = parameters['number_train']
     results_basepath = parameters['results_basepath']
-    cpu = parameters['cpu']
 
     only_quality = parameters['only_quality']
     golden_path = parameters['golden_path']
     result_path = parameters['result_path']
     others_path = parameters['others_path']
     io_path = parameters['io_path']
-    assert len(img_paths) == len(img_ids), "Fatal Error!"
 
-    ios = list()
+    overall_result_dic = dict()
+    overall_golden_dic = dict()
+    overall_others_dic = dict()
+
+    total_tasks = len(tasks)
     tmp_inference_dic = dict()
     tmp_total_dic = dict()
-    overall_result_dic = dict()
-    overall_others_dic = dict()
-    all_results = list()
-    a = time.perf_counter()
-    for batch_id, (img_path, img_id) in tqdm(enumerate(zip(img_paths, img_ids), start=1), ascii=True, total=len(img_ids)):
-        batch = [(img_path, img_id), ]
-        images = list()
-        image_sizes = list()
-        image_indices = list()
+    main_results = dict()
+    total_inference_time_start = time.perf_counter()
+    overall_batch_id = 0
+    ios = list()
+    for task_id, (task, (dev_path, subset_path)) in enumerate(zip(tasks, data_paths)):
+        # print(f' - Testing {task} ...')
+        records = []
+        dev_data_frame = pd.read_csv(dev_path, header=None)[:number_train]
+        subset_data_frame = pd.read_csv(subset_path, header=None)
+        for row_i in range(subset_data_frame.shape[0]):
+            # get prompt and make sure it fits
+            prompt_end = format_example(subset_data_frame, row_i, include_answer=False)
+            train_prompt = gen_prompt(dev_data_frame, task, number_train)
+            prompt = train_prompt + prompt_end
+            prompt_token_len = len(tokenizer.tokenize(prompt)) + 1 # bos token
+            prompt_qests_num = len(prompt.split("\n\n")) - 1 # without begining statement
+            while prompt_token_len > 2048:
+                prompt_split = prompt.split("\n\n")
+                prompt_split.pop(1)
+                prompt = '\n\n'.join(prompt_split)
+                prompt_token_len = len(tokenizer.tokenize(prompt)) + 1
+                prompt_qests_num = len(prompt.split("\n\n")) - 1
+            label = subset_data_frame.iloc[row_i, subset_data_frame.shape[1]-1]
+            records.append({'prompt': prompt, 'answer': label, 'token_length': prompt_token_len, 'question_number': prompt_qests_num})
 
-        for index, (img_path, img_id) in enumerate(batch):
-            raw_image = Image.open(img_path).convert("RGB")
-
-            w, h = raw_image.size
-
-            image = image_preprocessing_local(raw_image)
-
-            images.append(image)
-            image_sizes.append(torch.as_tensor([int(h), int(w)]))
-            image_indices.append(img_id)
-
-        this_i = (int(image_sizes[0][0]), int(image_sizes[0][1]))
-        if cpu:
-            images = nested_tensor_from_tensor_list(images)
-            image_sizes = torch.stack(image_sizes, dim=0)
-        else:
-            images = nested_tensor_from_tensor_list(images).to('cuda:0')
-            image_sizes = torch.stack(image_sizes, dim=0).to('cuda:0')
-
-        this_i_ap = (int(images.tensors.shape[2]), int(images.tensors.shape[3]))
-        inference_start = time.perf_counter()
-        preprocess_time = inference_start - a 
-        # print(images.tensors.shape)
-        results = detr(images)
-        # print(results['pred_logits'].shape)
-        # print(results['pred_logits'].dtype)
-        # print(results['pred_boxes'].shape)
-        # print(results['pred_boxes'].dtype)
-        inference_end = time.perf_counter()
-        inference_time = inference_end - inference_start
-        tmp_inference_dic[batch_id] = float(inference_time)
-
-        postprocess_start = time.perf_counter()
-        results = postprocess(results, image_sizes, image_indices)
-        postprocess_end = time.perf_counter()
-        postprocess_time = postprocess_end - postprocess_start
-        total_time = preprocess_time + inference_time + postprocess_time
-        # print(inference_time)
-        # print(total_time)
-        tmp_total_dic[batch_id] = float(total_time)
-        this_o = len(results[0])
-        ios.append((this_i, this_i_ap, this_o))
-
-        if fake_run:
-            image_sizes = image_sizes.tolist()
-            batch_image_shape = images.tensors.shape[-2:]
-            all_results.append(add_other(results, image_sizes, batch_image_shape))
-            if only_quality:
-                overall_result_dic[batch_id] = results
-                overall_others_dic[batch_id] = dict(
-                    image_sizes = image_sizes,
-                    batch_image_shape = batch_image_shape,
-                )
-
-        # logger.info('total_time, inference_time: ', total_time, inference_time)
+        answer_batches = batch_split([record['answer'] for record in records], batch_size)
+        token_length_batches = batch_split([record['token_length'] for record in records], batch_size)
+        question_number_batches = batch_split([record['question_number'] for record in records], batch_size)
         a = time.perf_counter()
+        batches = batch_split([record['prompt'] for record in records], batch_size)
+        for batch_id, batch_input in tqdm(enumerate(batches), total=len(batches), desc=f'No. {task_id}/{total_tasks} (TT={(time.perf_counter() - total_inference_time_start):.2f}s)'):
+            overall_batch_id += 1
+            encode_inputs = prepare_input(tokenizer, batch_input)
+            inference_start = time.perf_counter()
+            preprocess_time = inference_start - a 
+            # max_new_tokens -> Only Generate 1 Token based on prompt
+            outputs = llm.generate(**encode_inputs, max_new_tokens=1, pad_token_id=tokenizer.pad_token_id)
+            inference_end = time.perf_counter()
+            inference_time = inference_end - inference_start
+            tmp_inference_dic[overall_batch_id] = float(inference_time)
 
+            postprocess_start = time.perf_counter()
+            answers = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            postprocess_end = time.perf_counter()
+            postprocess_time = postprocess_end - postprocess_start
+            total_time = preprocess_time + inference_time + postprocess_time
+            # print(inference_time)
+            # print(total_time)
+            tmp_total_dic[overall_batch_id] = float(total_time)
+
+            ios.append((len(batch_input[0]), len(encode_inputs['input_ids'][0]), 1))
+            if fake_run:
+                if only_quality:
+                    overall_result_dic[overall_batch_id] = [answer[-1] for answer in answers]
+                    overall_golden_dic[overall_batch_id] = answer_batches[batch_id]
+                    overall_others_dic[overall_batch_id] = dict(
+                        token_lengths = token_length_batches[batch_id],
+                        question_numbers = question_number_batches[batch_id],
+                    )
+
+            # logger.info('total_time, inference_time: ', total_time, inference_time)
+            a = time.perf_counter()
+
+    logger.info(f'TT={(time.perf_counter() - total_inference_time_start):.2f}s')
     if fake_run:
-        main_results = list()
-        for all_result in all_results:
-            for result in all_result:
-                main_results.append(dict(
-                    result=result['result'],
-                    origin_image_size=result['origin_image_size'],
-                    batch_image_size=result['batch_image_size'],
-                ))
-
         with open(results_basepath.joinpath('Origin_Quality.json'), 'w') as f:
             json.dump(main_results, f, indent=2)
-
         if only_quality:
             with open(io_path, 'wb') as io_file:
                 pickle.dump(ios, io_file)
             # with open(result_path, 'w') as result_file:
             #     json.dump(overall_result_dic, result_file, indent=2)
-            # annotations_file_url = 'https://huggingface.co/datasets/AIJasonYoung/Tail-Quality-Assets/resolve/main/DETR/coco_2017_annotations.json'
-            # urllib.request.urlretrieve(annotations_file_url, golden_path)
+            # with open(golden_path, 'w') as golden_file:
+            #     json.dump(overall_golden_dic, golden_file, indent=2)
             # with open(others_path, 'w') as others_file:
             #     json.dump(overall_others_dic, others_file, indent=2)
 
@@ -330,8 +354,11 @@ if __name__ == "__main__":
     parser.add_argument('--max-run', type=int, default=0)
 
     parser.add_argument('--dataset-path', type=str, required=True)
-    parser.add_argument('--model-path', type=str, required=True)
-    parser.add_argument('--cpu', action='store_true')
+    parser.add_argument('--local', action='store_true', default=False)
+    parser.add_argument('--number-train', type=int, default=5)
+    parser.add_argument('--model-path', type=str, default="lmsys/vicuna-13b-v1.3")
+    parser.add_argument('--run-mode', type=str, default="val", choices=["val", "test"])
+    parser.add_argument('--batch-size', type=int, default=1)
 
     parser.add_argument('--only-quality', action='store_true')
     parser.add_argument('--golden-path', type=str, default=None)
@@ -346,16 +373,27 @@ if __name__ == "__main__":
         assert args.result_path is not None
         assert args.others_path is not None
 
-    model_path = Path(args.model_path)
-    assert model_path.is_file(), f"Model Weights path {model_path.absolute()} does not exist."
+    if args.model_path == 'lmsys/vicuna-13b-v1.3':
+        print(f"Using HuggingFace [Online] Pretrained Model: \'lmsys/vicuna-13b-v1.3\'")
+    else:
+        print(f"Using HuggingFace [Offline] Pretrained Model: \'lmsys/vicuna-13b-v1.3\'")
+        model_path = Path(args.model_path)
+        assert model_path.is_file(), f"Model Weights path {model_path.name} does not exist."
 
     dataset_root = Path(args.dataset_path)
-    assert dataset_root.is_dir(), f"provided COCO path {dataset_root.absolute()} does not exist"
+    assert dataset_root.is_dir(), f"provided MMLU path {dataset_root} does not exist"
 
-    anno_path = os.path.join(dataset_root, "annotations", "instances_val2017.json")
-    image_dir = os.path.join(dataset_root, "val2017")
+    dev_path = dataset_root.joinpath("dev")
+    assert dev_path.is_dir(), f"MMLU dev path {dev_path} does not exist"
 
-    img_paths, img_ids = load_dataset(anno_path, image_dir)
+    if args.run_mode == 'val':
+        val_path = dataset_root.joinpath("val")
+        assert val_path.is_dir(), f"MMLU val path {val_path} does not exist"
+        tasks, data_paths = load_dataset(dev_path, val_path, mode=args.run_mode)
+    if args.run_mode == 'test':
+        test_path = dataset_root.joinpath("test")
+        assert test_path.is_dir(), f"MMLU test path {test_path} does not exist"
+        tasks, data_paths = load_dataset(dev_path, test_path, mode=args.run_mode)
 
     results_basepath = pathlib.Path(args.results_basepath)
     min_run = args.min_run 
@@ -386,14 +424,7 @@ if __name__ == "__main__":
 
     # [!Begin] Model Initialization
 
-    detr = DETR()
-    state_dict = torch.load(args.model_path)
-    detr.load_state_dict(state_dict, strict=True)
-    if args.cpu:
-        detr.to('cpu')
-    else:
-        detr.to('cuda:0')
-    detr.eval()
+    llm, tokenizer = load_llm(args.model_path)
 
     # [!End] Model Initialization
 
@@ -403,12 +434,14 @@ if __name__ == "__main__":
         while not sucess_flag:
             loop += 1 # for debugging
             params = {
-                'img_paths': img_paths,
-                'img_ids': img_ids,
-                'detr': detr,
+                'data_paths': data_paths,
+                'tasks': tasks,
+                'tokenizer': tokenizer,
+                'llm': llm,
                 'fake_run': fake_run,
+                'batch_size': args.batch_size,
+                'number_train': args.number_train,
                 'results_basepath': results_basepath,
-                'cpu': args.cpu,
                 'only_quality': args.only_quality,
                 'golden_path': args.golden_path,
                 'result_path': args.result_path,
@@ -421,7 +454,7 @@ if __name__ == "__main__":
             logger.info(f'warm_run: {warm_run}')
             logger.info(f'fit_distribution_number: {fit_distribution_number}')
             if fake_run:
-                parameters_number = get_model_parameters_number(detr)
+                parameters_number = get_model_parameters_number(llm)
                 parameters_number_str = str()
                 for name, number in parameters_number.items():
                     parameters_number_str += f'{name}: {number} Elements ;\n'

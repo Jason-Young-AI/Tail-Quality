@@ -7,7 +7,7 @@ source $CONDA_PREFIX/bin/activate ${THIS_ENV_NAME}
 cd ./sources
 
 # HF_HOME=${THIS_MODEL_DIR} python run_tq.py \
-HF_ENDPOINT=https://hf-mirror.com HF_HOME=${THIS_MODEL_DIR} python run_tq.py \
+HF_ENDPOINT=https://hf-mirror.com HF_HOME=${THIS_MODEL_DIR} python get_io.py \
   --min-run 100 \
   --results-basepath ${THIS_RESULTS_DIR} \
   --warm-run 2 \
@@ -23,6 +23,7 @@ HF_ENDPOINT=https://hf-mirror.com HF_HOME=${THIS_MODEL_DIR} python run_tq.py \
   --only-quality \
   --result-path ${THIS_RESULTS_DIR}/result.json \
   --golden-path ${THIS_RESULTS_DIR}/golden.json \
-  --others-path ${THIS_RESULTS_DIR}/others.json
+  --others-path ${THIS_RESULTS_DIR}/others.json \
+  --io-path ${THIS_RESULTS_DIR}/io.pickle \
 
 cd ..

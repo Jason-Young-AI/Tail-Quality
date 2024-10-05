@@ -20,6 +20,6 @@ python get_io.py \
   --golden-path ${THIS_RESULTS_DIR}/golden.json \
   --result-path ${THIS_RESULTS_DIR}/result.json \
   --others-path ${THIS_RESULTS_DIR}/others.json \
-  --io-path ${THIS_RESULTS_DIR}/io.json
+  --io-path ${THIS_RESULTS_DIR}/io.pickle
 
 cd ..
