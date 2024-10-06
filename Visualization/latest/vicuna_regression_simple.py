@@ -64,7 +64,7 @@ if __name__ == "__main__":
     cmap = plt.get_cmap('coolwarm')
     fig, axes = plt.subplots(1, 1, figsize=(10, 10))
     ax = axes
-    ax.grid(True, color='gray', alpha=0.3, linewidth=0.2)
+    ax.grid(True, color='gray', alpha=0.6, linewidth=0.2)
 
 
     # all_l = [l for l in txt_sizes]
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     #         print(t_avg[i-1], t_avg[i], i)
 
 
-    ax.legend(title='Percentile Ranges', loc='upper left', title_fontsize=30, fontsize=30)
+    ax.legend(title='Percentile Ranges', loc='upper left', fontsize=26, title_fontproperties={'weight':'bold', 'size': 26})
     ax.tick_params(axis='x', labelsize=25)
     ax.tick_params(axis='y', labelsize=25)
     ax.set_xlabel('Tokens per Prompt', fontsize=30)
