@@ -68,8 +68,7 @@ if __name__ == "__main__":
     # print(min(t_std), max(t_std))
     # t_avg = [numpy.average(this_t) for _, this_t in i2t]
 
-    scatter = ax.scatter(i2t_i, i2t_t, cmap='coolwarm', alpha=0.6)
-    cbar = fig.colorbar(scatter, ax=ax)
+    scatter = ax.scatter(i2t_i, i2t_t, alpha=0.6)
 
     ax.set_xlabel('Image Size')
     ax.set_ylabel('Frequencies')
